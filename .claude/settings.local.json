@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(composer create-project:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(composer require:*)",
+      "Bash(php artisan filament:install:*)",
+      "Bash(ls -la \"D:\\\\feloniuk\\\\fin-crm\\\\app\\\\Filament\"\" 2>/dev/null || echo \"Directory not found \")",
+      "Bash(dir:*)",
+      "Bash(php artisan make:filament-page:*)",
+      "Bash(php artisan:*)"
+    ]
+  }
+}
