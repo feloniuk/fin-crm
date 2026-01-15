@@ -117,7 +117,7 @@ class InvoiceResource extends Resource
                     ->schema([
                         Forms\Components\Repeater::make('items')
                             ->label('Позиції рахунку')
-                            ->relationship()
+                            ->relationship(condition: fn () => request()->routeIs('*.edit'))
                             ->schema([
                                 Forms\Components\TextInput::make('name')
                                     ->label('Товар')
@@ -336,6 +336,36 @@ class InvoiceResource extends Resource
                     ->label('Оплачено'),
             ])
             ->actions([
+                Tables\Actions\Action::make('downloadExcel')
+                    ->label('Excel')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('success')
+                    ->url(fn (Invoice $record) => $record->excel_path ? route('invoice.download-excel', $record) : null)
+                    ->openUrlInNewTab()
+                    ->visible(fn (Invoice $record) => $record->excel_path && file_exists($record->excel_path)),
+
+                Tables\Actions\Action::make('downloadPdf')
+                    ->label('PDF')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('danger')
+                    ->url(fn (Invoice $record) => $record->pdf_path ? route('invoice.download-pdf', $record) : null)
+                    ->openUrlInNewTab()
+                    ->visible(fn (Invoice $record) => $record->pdf_path && file_exists($record->pdf_path)),
+
+                Tables\Actions\Action::make('markAsPaid')
+                    ->label('Оплачено')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->action(function (Invoice $record) {
+                        $record->update([
+                            'is_paid' => true,
+                            'paid_at' => now(),
+                        ]);
+                    })
+                    ->visible(fn (Invoice $record) => !$record->is_paid)
+                    ->successNotificationTitle('Рахунок позначено як оплачено'),
+
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
             ])

@@ -1,0 +1,142 @@
+<?php
+
+return [
+    // Model names
+    'models' => [
+        'shop' => 'Магазин',
+        'shops' => 'Магазини',
+        'our_company' => 'Наша компанія',
+        'our_companies' => 'Наші компанії',
+        'counterparty' => 'Контрагент',
+        'counterparties' => 'Контрагенти',
+        'order' => 'Замовлення',
+        'orders' => 'Замовлення',
+        'invoice' => 'Рахунок',
+        'invoices' => 'Рахунки',
+        'invoice_item' => 'Позиція рахунку',
+        'invoice_items' => 'Позиції рахунку',
+        'user' => 'Користувач',
+        'users' => 'Користувачі',
+    ],
+
+    // Shop fields
+    'shop' => [
+        'id' => 'ID',
+        'name' => 'Назва магазину',
+        'type' => 'Тип магазину',
+        'api_credentials' => 'API облік',
+        'is_active' => 'Активний',
+        'last_synced_at' => 'Остання синхронізація',
+        'created_at' => 'Створено',
+        'updated_at' => 'Оновлено',
+        'orders_count' => 'Кількість замовлень',
+    ],
+
+    // OurCompany fields
+    'our_company' => [
+        'id' => 'ID',
+        'name' => 'Назва компанії',
+        'type' => 'Тип компанії',
+        'tax_system' => 'Система оподаткування',
+        'edrpou_ipn' => 'ЄДРПОУ/IПН',
+        'address' => 'Адреса',
+        'phone' => 'Телефон',
+        'email' => 'Email',
+        'bank_details' => 'Реквізити банку',
+        'signatory_name' => 'ПІБ підписанта',
+        'signatory_position' => 'Посада підписанта',
+        'annual_limit' => 'Річний ліміт',
+        'is_active' => 'Активна',
+        'created_at' => 'Створено',
+        'updated_at' => 'Оновлено',
+        'invoices_count' => 'Кількість рахунків',
+        'yearly_invoiced_amount' => 'Виписано за рік',
+        'yearly_paid_amount' => 'Оплачено за рік',
+        'remaining_limit' => 'Залишок ліміту',
+        'limit_usage_percent' => 'Використання ліміту, %',
+    ],
+
+    // Counterparty fields
+    'counterparty' => [
+        'id' => 'ID',
+        'name' => 'Назва контрагента',
+        'edrpou_ipn' => 'ЄДРПОУ/IПН',
+        'address' => 'Адреса',
+        'phone' => 'Телефон',
+        'email' => 'Email',
+        'is_auto_created' => 'Автоматично створений',
+        'created_at' => 'Створено',
+        'updated_at' => 'Оновлено',
+        'invoices_count' => 'Кількість рахунків',
+    ],
+
+    // Order fields
+    'order' => [
+        'id' => 'ID',
+        'shop_id' => 'Магазин',
+        'external_id' => 'ID у магазині',
+        'customer_name' => "Ім'я клієнта",
+        'customer_phone' => 'Телефон клієнта',
+        'customer_comment' => 'Коментар клієнта',
+        'total_amount' => 'Сума замовлення',
+        'status' => 'Статус',
+        'raw_data' => 'Дані з API',
+        'synced_at' => 'Синхронізовано',
+        'created_at' => 'Створено',
+        'updated_at' => 'Оновлено',
+        'shop' => 'Магазин',
+        'invoice' => 'Рахунок',
+    ],
+
+    // Invoice fields
+    'invoice' => [
+        'id' => 'ID',
+        'invoice_number' => 'Номер рахунку',
+        'invoice_date' => 'Дата рахунку',
+        'order_id' => 'Замовлення',
+        'our_company_id' => 'Наша компанія',
+        'counterparty_id' => 'Контрагент',
+        'with_vat' => 'З ПДВ',
+        'comment' => 'Коментар',
+        'discount_type' => 'Тип знижки',
+        'discount_value' => 'Розмір знижки',
+        'subtotal' => 'Сума без ПДВ',
+        'vat_amount' => 'ПДВ',
+        'total' => 'Сума до оплати',
+        'is_paid' => 'Оплачено',
+        'paid_at' => 'Дата оплати',
+        'excel_path' => 'Шлях до Excel',
+        'pdf_path' => 'Шлях до PDF',
+        'created_at' => 'Створено',
+        'updated_at' => 'Оновлено',
+        'our_company' => 'Наша компанія',
+        'counterparty' => 'Контрагент',
+        'order' => 'Замовлення',
+    ],
+
+    // InvoiceItem fields
+    'invoice_item' => [
+        'id' => 'ID',
+        'invoice_id' => 'Рахунок',
+        'name' => 'Назва товару/послуги',
+        'quantity' => 'Кількість',
+        'unit' => 'Одиниця',
+        'unit_price' => 'Ціна за одиницю',
+        'discount' => 'Знижка',
+        'total' => 'Сума',
+        'created_at' => 'Створено',
+        'updated_at' => 'Оновлено',
+    ],
+
+    // User fields
+    'user' => [
+        'id' => 'ID',
+        'name' => "Ім'я",
+        'email' => 'Email',
+        'email_verified_at' => 'Email підтверджено',
+        'password' => 'Пароль',
+        'role' => 'Роль',
+        'created_at' => 'Створено',
+        'updated_at' => 'Оновлено',
+    ],
+];
