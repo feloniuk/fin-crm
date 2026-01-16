@@ -80,14 +80,13 @@ class InvoiceResource extends Resource
                             ->options(fn () => Counterparty::orderBy('name')->pluck('name', 'id'))
                             ->required()
                             ->searchable()
-                            ->creatable()
                             ->createOptionForm([
                                 Forms\Components\TextInput::make('name')
                                     ->label('Назва/ПІБ')
                                     ->required(),
                                 Forms\Components\TextInput::make('edrpou_ipn')
                                     ->label('ЄДРПОУ/ІПН')
-                                    ->length(10),
+                                    ->maxLength(10),
                                 Forms\Components\TextInput::make('address')
                                     ->label('Адреса'),
                                 Forms\Components\TextInput::make('phone')
@@ -97,18 +96,23 @@ class InvoiceResource extends Resource
                                     ->label('Email')
                                     ->email(),
                             ])
-                            ->visibleOn('create'),
+                            ->createOptionUsing(function (array $data): int {
+                                $counterparty = Counterparty::create($data);
+                                return $counterparty->id;
+                            }),
 
-                        Forms\Components\TextInput::make('counterparty_search')
-                            ->label('Пошук контрагента по ЄДРПОУ')
-                            ->live(debounce: 500)
-                            ->afterStateUpdated(function (Set $set, $state) {
-                                if (strlen($state) === 10 && ctype_digit($state)) {
-                                    $counterparty = Counterparty::findByEdrpou($state);
-                                    if ($counterparty) {
-                                        $set('counterparty_id', $counterparty->id);
-                                    }
+                        Forms\Components\Placeholder::make('counterparty_info')
+                            ->label('Інформація про контрагента')
+                            ->content(function (Get $get): string {
+                                $counterparty = Counterparty::find($get('counterparty_id'));
+                                if (!$counterparty) {
+                                    return 'Контрагент не вибраний';
                                 }
+                                $info = $counterparty->name;
+                                if ($counterparty->edrpou_ipn) {
+                                    $info .= ' (ЄДРПОУ: ' . $counterparty->edrpou_ipn . ')';
+                                }
+                                return $info;
                             })
                             ->visibleOn('edit'),
                     ]),
@@ -237,6 +241,7 @@ class InvoiceResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn ($query) => $query->with(['ourCompany', 'counterparty']))
             ->columns([
                 Tables\Columns\TextColumn::make('invoice_number')
                     ->label('Номер')

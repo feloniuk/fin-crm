@@ -2,11 +2,14 @@
 
 namespace App\Filament\Resources;
 
+use App\Actions\Order\SyncOrdersAction;
 use App\Enums\ShopType;
 use App\Filament\Resources\ShopResource\Pages;
 use App\Models\Shop;
+use App\Services\Shop\ShopApiClientFactory;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -120,6 +123,61 @@ class ShopResource extends Resource
                     ->label('Активний'),
             ])
             ->actions([
+                Tables\Actions\Action::make('testConnection')
+                    ->label('Тест')
+                    ->icon('heroicon-o-signal')
+                    ->color('info')
+                    ->action(function (Shop $record) {
+                        try {
+                            $client = ShopApiClientFactory::make($record);
+                            if ($client->testConnection()) {
+                                Notification::make()
+                                    ->success()
+                                    ->title('Успіх')
+                                    ->body("З'єднання з {$record->name} встановлено успішно!")
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->danger()
+                                    ->title('Помилка')
+                                    ->body("Не вдалося з'єднатися: " . $client->getLastError())
+                                    ->send();
+                            }
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->danger()
+                                ->title('Помилка')
+                                ->body($e->getMessage())
+                                ->send();
+                        }
+                    }),
+
+                Tables\Actions\Action::make('syncOrders')
+                    ->label('Синхронізувати')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Синхронізація замовлень')
+                    ->modalDescription('Розпочати синхронізацію замовлень з цього магазину?')
+                    ->action(function (Shop $record) {
+                        try {
+                            $action = app(SyncOrdersAction::class);
+                            $action->execute($record);
+
+                            Notification::make()
+                                ->success()
+                                ->title('Успіх')
+                                ->body("Замовлення з {$record->name} успішно синхронізовано!")
+                                ->send();
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->danger()
+                                ->title('Помилка синхронізації')
+                                ->body($e->getMessage())
+                                ->send();
+                        }
+                    }),
+
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
             ])

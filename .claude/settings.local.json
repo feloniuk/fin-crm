@@ -8,7 +8,8 @@
       "Bash(ls -la \"D:\\\\feloniuk\\\\fin-crm\\\\app\\\\Filament\"\" 2>/dev/null || echo \"Directory not found \")",
       "Bash(dir:*)",
       "Bash(php artisan make:filament-page:*)",
-      "Bash(php artisan:*)"
+      "Bash(php artisan:*)",
+      "Bash(php -l:*)"
     ]
   }
 }

@@ -6,6 +6,7 @@ use App\Actions\Invoice\CreateInvoiceAction;
 use App\Enums\DiscountType;
 use App\Filament\Resources\InvoiceResource;
 use App\Models\Counterparty;
+use App\Models\Order;
 use App\Models\OurCompany;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
@@ -14,6 +15,53 @@ use Illuminate\Database\Eloquent\Model;
 class CreateInvoice extends CreateRecord
 {
     protected static string $resource = InvoiceResource::class;
+
+    public ?Order $order = null;
+
+    public function mount(): void
+    {
+        parent::mount();
+
+        // Check if order_id is passed in URL
+        $orderId = request()->query('order_id');
+        if ($orderId) {
+            $this->order = Order::find($orderId);
+            if ($this->order) {
+                $this->fillFormFromOrder();
+            }
+        }
+    }
+
+    protected function fillFormFromOrder(): void
+    {
+        if (!$this->order) {
+            return;
+        }
+
+        // Find or create counterparty from order data
+        $counterparty = null;
+        if ($this->order->customer_phone) {
+            $counterparty = Counterparty::where('phone', $this->order->customer_phone)->first();
+        }
+
+        // Get items from order
+        $items = collect($this->order->getItemsFromRawData())->map(function ($item) {
+            return [
+                'name' => $item['name'],
+                'quantity' => $item['quantity'],
+                'unit' => 'шт.',
+                'unit_price' => $item['unit_price'],
+                'discount' => 0,
+                'total' => $item['quantity'] * $item['unit_price'],
+            ];
+        })->toArray();
+
+        $this->form->fill([
+            'order_id' => $this->order->id,
+            'counterparty_id' => $counterparty?->id,
+            'items' => $items,
+        ]);
+    }
 
     public function mutateFormDataBeforeCreate(array $data): array
     {
@@ -27,6 +75,7 @@ class CreateInvoice extends CreateRecord
         try {
             $company = OurCompany::findOrFail($this->data['our_company_id']);
             $counterparty = Counterparty::findOrFail($this->data['counterparty_id']);
+            $order = isset($this->data['order_id']) ? Order::find($this->data['order_id']) : null;
 
             $action = app(CreateInvoiceAction::class);
 
@@ -35,7 +84,7 @@ class CreateInvoice extends CreateRecord
                 counterparty: $counterparty,
                 items: $this->data['items'] ?? [],
                 withVat: (bool) ($this->data['with_vat'] ?? false),
-                order: null,
+                order: $order,
                 comment: $this->data['comment'] ?? null,
                 discountType: DiscountType::tryFrom($this->data['discount_type'] ?? '') ?? DiscountType::NONE,
                 discountValue: (float) ($this->data['discount_value'] ?? 0),

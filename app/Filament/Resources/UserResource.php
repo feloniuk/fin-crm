@@ -46,8 +46,11 @@ class UserResource extends Resource
                             ->label('Пароль')
                             ->password()
                             ->required(fn (string $context): bool => $context === 'create')
-                            ->visibleOn('create')
-                            ->minLength(8),
+                            ->dehydrated(fn ($state) => filled($state))
+                            ->minLength(8)
+                            ->helperText(fn (string $context): ?string =>
+                                $context === 'edit' ? 'Залиште порожнім, щоб не змінювати пароль' : null
+                            ),
 
                         Forms\Components\Select::make('role')
                             ->label('Роль')

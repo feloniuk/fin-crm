@@ -48,7 +48,8 @@ class OurCompanyResource extends Resource
                             ->label('Система оподаткування')
                             ->options(TaxSystem::class)
                             ->required()
-                            ->native(false),
+                            ->native(false)
+                            ->live(),
 
                         Forms\Components\TextInput::make('edrpou_ipn')
                             ->label('ЄДРПОУ/ІПН')
@@ -123,12 +124,11 @@ class OurCompanyResource extends Resource
                             ->label('Річний ліміт (грн)')
                             ->numeric()
                             ->minValue(0)
-                            ->step(0.01)
-                            ->visible(fn (Get $get): bool =>
-                                $get('tax_system') === TaxSystem::SINGLE_TAX->value
-                            ),
+                            ->step(0.01),
                     ])
-                    ->visibleOn('create'),
+                    ->visible(fn (Get $get): bool =>
+                        $get('tax_system') === TaxSystem::SINGLE_TAX->value
+                    ),
 
                 Forms\Components\Section::make('Статистика')
                     ->schema([

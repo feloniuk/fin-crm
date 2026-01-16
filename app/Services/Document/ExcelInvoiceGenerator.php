@@ -145,12 +145,14 @@ class ExcelInvoiceGenerator implements DocumentGeneratorInterface
 
     private function applyBorderStyle(&$sheet, $range): void
     {
-        $borderStyle = new Border();
-        $borderStyle->setBottom(new \PhpOffice\PhpSpreadsheet\Style\Borders\Border('thin'));
-        $borderStyle->setTop(new \PhpOffice\PhpSpreadsheet\Style\Borders\Border('thin'));
-        $borderStyle->setLeft(new \PhpOffice\PhpSpreadsheet\Style\Borders\Border('thin'));
-        $borderStyle->setRight(new \PhpOffice\PhpSpreadsheet\Style\Borders\Border('thin'));
+        $borderStyle = [
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                ],
+            ],
+        ];
 
-        $sheet->getStyle($range)->setBorder($borderStyle);
+        $sheet->getStyle($range)->applyFromArray($borderStyle);
     }
 }

@@ -1,16 +1,13 @@
 @php
-    $companies = $this->getCompanies();
+    $companies = $this->getCompaniesWithLimits();
 @endphp
 
 <div class="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-    @forelse($companies as $company)
-        @php
-            $data = $this->getCompanyLimitData($company);
-        @endphp
+    @forelse($companies as $data)
         <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
             <div class="mb-2 flex items-center justify-between">
                 <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {{ $company->name }}
+                    {{ $data['name'] }}
                 </h3>
                 <span class="text-xs font-semibold text-gray-600 dark:text-gray-400">
                     {{ $data['percent'] }}%

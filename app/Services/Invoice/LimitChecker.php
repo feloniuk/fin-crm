@@ -19,9 +19,9 @@ class LimitChecker
 
         $yearlyTotal = $company->getYearlyInvoicedAmount();
         $newTotal = $yearlyTotal + $invoiceTotal;
-        $limit = $company->annual_limit;
+        $limit = (float) $company->annual_limit;
         $remaining = $limit - $newTotal;
-        $percent = ($newTotal / $limit) * 100;
+        $percent = $limit > 0 ? ($newTotal / $limit) * 100 : 0;
 
         return [
             'isExceeded' => $newTotal > $limit,
@@ -49,12 +49,12 @@ class LimitChecker
 
     public function getLimitUsagePercent(OurCompany $company): ?float
     {
-        if (!$this->hasLimit($company)) {
+        if (!$this->hasLimit($company) || (float) $company->annual_limit <= 0) {
             return null;
         }
 
         return round(
-            ($company->getYearlyInvoicedAmount() / $company->annual_limit) * 100,
+            ($company->getYearlyInvoicedAmount() / (float) $company->annual_limit) * 100,
             2
         );
     }

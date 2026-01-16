@@ -12,13 +12,18 @@ class RecentOrdersWidget extends BaseWidget
 {
     protected static ?int $sort = 2;
 
-    protected static ?string $heading = '📦 Останні нові замовлення';
+    protected static ?string $heading = 'Останні нові замовлення';
+
+    // Disable polling
+    protected static ?string $pollingInterval = null;
 
     public function table(Table $table): Table
     {
         return $table
             ->query(
-                Order::where('status', OrderStatus::New)
+                Order::query()
+                    ->where('status', OrderStatus::NEW)
+                    ->with('shop:id,name') // Eager load shop
                     ->latest('created_at')
                     ->limit(5)
             )

@@ -122,7 +122,7 @@ class CreateInvoiceAction
 
             // Update order status if order exists
             if ($order) {
-                $order->update(['status' => OrderStatus::Invoiced]);
+                $order->update(['status' => OrderStatus::INVOICED]);
             }
 
             return $invoice;

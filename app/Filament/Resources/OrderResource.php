@@ -7,6 +7,7 @@ use App\Filament\Resources\OrderResource\Pages;
 use App\Models\Order;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -103,6 +104,7 @@ class OrderResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn ($query) => $query->with(['shop', 'invoice']))
             ->columns([
                 Tables\Columns\TextColumn::make('shop.name')
                     ->label('Магазин')
@@ -187,6 +189,15 @@ class OrderResource extends Resource
                     }),
             ])
             ->actions([
+                Tables\Actions\Action::make('createInvoice')
+                    ->label('Створити рахунок')
+                    ->icon('heroicon-o-document-plus')
+                    ->color('success')
+                    ->visible(fn (Order $record) => $record->canCreateInvoice())
+                    ->url(fn (Order $record) => route('filament.admin.resources.invoices.create', [
+                        'order_id' => $record->id,
+                    ])),
+
                 Tables\Actions\ViewAction::make(),
             ])
             ->bulkActions([
