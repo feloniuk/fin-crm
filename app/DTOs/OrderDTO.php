@@ -24,7 +24,7 @@ class OrderDTO
             customerPhone: $data['customer_phone'] ?? $data['customer']['phone'] ?? '',
             customerComment: $data['customer_comment'] ?? $data['comment'] ?? '',
             totalAmount: (float) ($data['total_amount'] ?? $data['total'] ?? 0),
-            items: collect($data['items'] ?? []),
+            items: collect($data['items'] ?? $data['products'] ?? []),
             rawData: $data,
         );
     }

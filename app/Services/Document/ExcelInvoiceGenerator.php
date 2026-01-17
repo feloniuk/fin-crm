@@ -120,7 +120,8 @@ class ExcelInvoiceGenerator implements DocumentGeneratorInterface
         }
 
         // Generate file
-        $fileName = 'invoice_' . $invoice->invoice_number . '_' . time() . '.xlsx';
+        $safeNumber = str_replace(['/', '\\'], '-', $invoice->invoice_number);
+        $fileName = 'invoice_' . $safeNumber . '_' . time() . '.xlsx';
         $path = storage_path('app/invoices/' . $fileName);
 
         if (!is_dir(dirname($path))) {

@@ -32,6 +32,10 @@ class OrderResource extends Resource
             ->schema([
                 Forms\Components\Section::make('Інформація про замовлення')
                     ->schema([
+                        Forms\Components\TextInput::make('order_number')
+                            ->label('№ замовлення')
+                            ->disabled(),
+
                         Forms\Components\TextInput::make('external_id')
                             ->label('ID в магазині')
                             ->disabled(),
@@ -98,23 +102,80 @@ class OrderResource extends Resource
                             ),
                     ])
                     ->columns(2),
+
+                Forms\Components\Section::make('Компанія та ПДВ')
+                    ->description('Виберіть компанію-виконавця та режим оподаткування для цього замовлення')
+                    ->schema([
+                        Forms\Components\Select::make('our_company_id')
+                            ->label('Компанія-виконавець')
+                            ->relationship('ourCompany', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->required(fn (Order $record): bool => $record->status->canCreateInvoice())
+                            ->helperText('Компанія, яка буде виконувати замовлення')
+                            ->visibleOn('edit'),
+
+                        Forms\Components\Toggle::make('with_vat')
+                            ->label('З ПДВ')
+                            ->required(fn (Order $record): bool => $record->status->canCreateInvoice())
+                            ->helperText('Чи буде рахунок з ПДВ (20%)')
+                            ->visibleOn('edit'),
+                    ])
+                    ->columns(2)
+                    ->visibleOn('edit')
+                    ->visible(fn (Order $record): bool => $record->status->canCreateInvoice()),
+
+                Forms\Components\Section::make('Товари замовлення')
+                    ->schema([
+                        Forms\Components\Placeholder::make('items_count')
+                            ->label('Кількість позицій')
+                            ->content(fn (Order $record): string =>
+                                $record->items()->count() ?? '0'
+                            ),
+
+                        Forms\Components\Placeholder::make('items_subtotal')
+                            ->label('Сума без знижок')
+                            ->content(fn (Order $record): string =>
+                                number_format($record->subtotal ?? 0, 2, ',', ' ') . ' грн'
+                            ),
+
+                        Forms\Components\Placeholder::make('items_discount')
+                            ->label('Знижки')
+                            ->content(fn (Order $record): string =>
+                                number_format($record->discount_total ?? 0, 2, ',', ' ') . ' грн'
+                            ),
+
+                        Forms\Components\Placeholder::make('items_total')
+                            ->label('Всього')
+                            ->content(fn (Order $record): string =>
+                                number_format(($record->subtotal ?? 0) - ($record->discount_total ?? 0), 2, ',', ' ') . ' грн'
+                            ),
+                    ])
+                    ->columns(2)
+                    ->visibleOn('edit'),
             ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with(['shop', 'invoice']))
+            ->modifyQueryUsing(fn ($query) => $query->with(['shop', 'invoice', 'ourCompany']))
             ->columns([
                 Tables\Columns\TextColumn::make('shop.name')
                     ->label('Магазин')
                     ->sortable()
                     ->searchable(),
 
-                Tables\Columns\TextColumn::make('external_id')
-                    ->label('ID замовлення')
+                Tables\Columns\TextColumn::make('order_number')
+                    ->label('№ замовлення')
                     ->searchable()
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('external_id')
+                    ->label('ID в магазині')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('customer_name')
                     ->label('Покупець')
@@ -136,6 +197,22 @@ class OrderResource extends Resource
                     ->label('Статус')
                     ->badge()
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('ourCompany.name')
+                    ->label('Компанія')
+                    ->sortable()
+                    ->searchable()
+                    ->placeholder('—')
+                    ->toggleable(),
+
+                Tables\Columns\IconColumn::make('with_vat')
+                    ->label('ПДВ')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('gray')
+                    ->toggleable(),
 
                 Tables\Columns\IconColumn::make('invoice_exists')
                     ->label('Рахунок')
@@ -168,6 +245,20 @@ class OrderResource extends Resource
                 Tables\Filters\Filter::make('without_invoice')
                     ->label('Без рахунку')
                     ->query(fn ($query) => $query->doesntHave('invoice')),
+
+                Tables\Filters\Filter::make('without_company')
+                    ->label('Без компанії')
+                    ->query(fn ($query) => $query->whereNull('our_company_id')),
+
+                Tables\Filters\SelectFilter::make('our_company')
+                    ->label('Компанія')
+                    ->relationship('ourCompany', 'name'),
+
+                Tables\Filters\TernaryFilter::make('with_vat')
+                    ->label('ПДВ')
+                    ->placeholder('Всі')
+                    ->trueLabel('З ПДВ')
+                    ->falseLabel('Без ПДВ'),
 
                 Tables\Filters\Filter::make('created_at')
                     ->form([
@@ -202,7 +293,49 @@ class OrderResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    //
+                    Tables\Actions\BulkAction::make('assignCompanyAndVat')
+                        ->label('Призначити компанію та ПДВ')
+                        ->icon('heroicon-o-building-office')
+                        ->color('primary')
+                        ->form([
+                            Forms\Components\Select::make('our_company_id')
+                                ->label('Компанія-виконавець')
+                                ->options(
+                                    \App\Models\OurCompany::active()
+                                        ->pluck('name', 'id')
+                                )
+                                ->required()
+                                ->searchable()
+                                ->helperText('Компанія, яка буде виконувати замовлення'),
+
+                            Forms\Components\Toggle::make('with_vat')
+                                ->label('З ПДВ')
+                                ->required()
+                                ->helperText('Чи будуть рахунки з ПДВ (20%)'),
+                        ])
+                        ->action(function ($records, array $data) {
+                            $updated = 0;
+                            foreach ($records as $record) {
+                                // Оновлюємо тільки замовлення без рахунків
+                                if (!$record->invoice) {
+                                    $record->update([
+                                        'our_company_id' => $data['our_company_id'],
+                                        'with_vat' => $data['with_vat'],
+                                    ]);
+                                    $updated++;
+                                }
+                            }
+
+                            Notification::make()
+                                ->title("Оновлено {$updated} замовлень")
+                                ->success()
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->modalHeading('Призначити компанію та ПДВ')
+                        ->modalDescription('Буде оновлено тільки замовлення без створених рахунків.')
+                        ->modalSubmitActionLabel('Призначити'),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');

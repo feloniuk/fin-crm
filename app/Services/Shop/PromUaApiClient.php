@@ -22,7 +22,7 @@ class PromUaApiClient implements ShopApiClientInterface
         try {
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $this->credentials->apiKey,
-            ])->timeout(10)->get('https://api.prom.ua/v1/me');
+            ])->timeout(10)->get('https://my.prom.ua/api/v1/me');
 
             if ($response->successful()) {
                 return true;
@@ -51,7 +51,7 @@ class PromUaApiClient implements ShopApiClientInterface
             while ($hasMore) {
                 $response = Http::withHeaders([
                     'Authorization' => 'Bearer ' . $this->credentials->apiKey,
-                ])->timeout(30)->get('https://api.prom.ua/v1/orders', [
+                ])->timeout(30)->get('https://my.prom.ua/api/v1/orders/list', [
                     'updated_from' => $since->toIso8601String(),
                     'limit' => 100,
                     'page' => $page,
@@ -85,7 +85,7 @@ class PromUaApiClient implements ShopApiClientInterface
         try {
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $this->credentials->apiKey,
-            ])->timeout(10)->get("https://api.prom.ua/v1/orders/{$externalId}");
+            ])->timeout(10)->get("https://my.prom.ua/api/v1/orders/{$externalId}");
 
             if ($response->successful()) {
                 return OrderDTO::fromArray($response->json('data', []));

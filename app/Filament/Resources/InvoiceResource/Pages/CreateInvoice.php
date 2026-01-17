@@ -44,17 +44,32 @@ class CreateInvoice extends CreateRecord
             $counterparty = Counterparty::where('phone', $this->order->customer_phone)->first();
         }
 
-        // Get items from order
-        $items = collect($this->order->getItemsFromRawData())->map(function ($item) {
-            return [
-                'name' => $item['name'],
-                'quantity' => $item['quantity'],
-                'unit' => 'шт.',
-                'unit_price' => $item['unit_price'],
-                'discount' => 0,
-                'total' => $item['quantity'] * $item['unit_price'],
-            ];
-        })->toArray();
+        // Get items from order - use order_items if available, fallback to raw_data
+        if ($this->order->items()->exists()) {
+            // Use order_items with discounts applied
+            $items = $this->order->items()->get()->map(function ($item) {
+                return [
+                    'name' => $item->name,
+                    'quantity' => $item->quantity,
+                    'unit' => 'шт.',
+                    'unit_price' => $item->unit_price,
+                    'discount' => $item->discount_amount,
+                    'total' => $item->total,
+                ];
+            })->toArray();
+        } else {
+            // Fallback to raw_data for legacy orders
+            $items = collect($this->order->getItemsFromRawData())->map(function ($item) {
+                return [
+                    'name' => $item['name'],
+                    'quantity' => $item['quantity'],
+                    'unit' => 'шт.',
+                    'unit_price' => $item['unit_price'],
+                    'discount' => 0,
+                    'total' => $item['quantity'] * $item['unit_price'],
+                ];
+            })->toArray();
+        }
 
         $this->form->fill([
             'order_id' => $this->order->id,

@@ -11,6 +11,22 @@ use Illuminate\Support\Facades\Log;
 class WebhookController extends Controller
 {
     /**
+     * Allowed IP addresses for webhooks
+     * Note: Add actual IPs from Horoshop and Prom.ua support
+     */
+    private const ALLOWED_IPS = [
+        // Horoshop IPs (to be confirmed with support)
+        // '194.44.xxx.xxx',
+
+        // Prom.ua IPs (to be confirmed with support)
+        // '195.248.xxx.xxx',
+
+        // Allow localhost for testing
+        '127.0.0.1',
+        '::1',
+    ];
+
+    /**
      * Handle Horoshop webhook
      */
     public function horoshop(Request $request, Shop $shop)
@@ -30,15 +46,29 @@ class WebhookController extends Controller
     {
         $signature = $request->header('X-Signature');
         $event = $request->input('event');
+        $clientIp = $request->ip();
 
-        // Verify webhook signature if provided
-        if ($signature && !$this->verifySignature($request, $shop, $signature)) {
-            Log::warning('Invalid webhook signature', [
+        // Security: Either IP must be whitelisted OR signature must be valid
+        $isIpAllowed = $this->isAllowedIp($clientIp);
+        $isSignatureValid = $signature && $this->verifySignature($request, $shop, $signature);
+
+        if (!$isIpAllowed && !$isSignatureValid) {
+            Log::warning('Webhook authorization failed', [
                 'shop_id' => $shop->id,
                 'event' => $event,
+                'ip' => $clientIp,
+                'has_signature' => (bool) $signature,
             ]);
 
-            return response('Invalid signature', 403);
+            return response('Unauthorized', 403);
+        }
+
+        // Log if signature was invalid but IP was allowed (for debugging)
+        if ($signature && !$isSignatureValid && $isIpAllowed) {
+            Log::info('Webhook signature invalid but IP is whitelisted', [
+                'shop_id' => $shop->id,
+                'ip' => $clientIp,
+            ]);
         }
 
         try {
@@ -93,5 +123,16 @@ class WebhookController extends Controller
         $expectedSignature = hash_hmac('sha256', $payload, $apiSecret);
 
         return hash_equals($expectedSignature, $signature);
+    }
+
+    /**
+     * Check if IP is in the allowed list
+     */
+    private function isAllowedIp(string $ip): bool
+    {
+        // Also check for IPs behind proxies (Cloudflare, load balancers)
+        // In production, configure trusted proxies in TrustProxies middleware
+
+        return in_array($ip, self::ALLOWED_IPS, true);
     }
 }

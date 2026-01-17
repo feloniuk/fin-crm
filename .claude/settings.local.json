@@ -9,7 +9,23 @@
       "Bash(dir:*)",
       "Bash(php artisan make:filament-page:*)",
       "Bash(php artisan:*)",
-      "Bash(php -l:*)"
+      "Bash(php -l:*)",
+      "Bash(composer dump-autoload:*)",
+      "Bash(php:*)",
+      "Bash(php -m:*)",
+      "Bash(findstr:*)",
+      "Bash(timeout:*)",
+      "Bash(curl:*)",
+      "Bash(composer install:*)",
+      "Bash(composer update:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm install)",
+      "Bash(ls:*)",
+      "Bash(lsof:*)",
+      "Bash(netstat:*)",
+      "Bash(kill:*)",
+      "Bash(wmic process where \"name=''php.exe''\" delete)",
+      "Bash(composer show:*)"
     ]
   }
 }

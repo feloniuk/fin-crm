@@ -47,6 +47,8 @@ class SyncOrdersAction
             $newOrdersCount = 0;
             $updatedOrdersCount = 0;
 
+            $syncOrderItems = new SyncOrderItemsAction();
+
             // Process each order from API
             foreach ($apiOrders as $orderDTO) {
                 $existingOrder = Order::where('shop_id', $shop->id)
@@ -66,19 +68,22 @@ class SyncOrdersAction
                     $updatedOrdersCount++;
                 } else {
                     // Create new order
-                    Order::create([
+                    $existingOrder = Order::create([
                         'shop_id' => $shop->id,
                         'external_id' => $orderDTO->externalId,
                         'customer_name' => $orderDTO->customerName,
                         'customer_phone' => $orderDTO->customerPhone,
                         'customer_comment' => $orderDTO->customerComment,
                         'total_amount' => $orderDTO->totalAmount,
-                        'status' => OrderStatus::New,
+                        'status' => OrderStatus::NEW,
                         'raw_data' => $orderDTO->rawData,
                         'synced_at' => now(),
                     ]);
                     $newOrdersCount++;
                 }
+
+                // Синхронізувати items замовлення
+                $syncOrderItems->execute($existingOrder);
             }
 
             // Update shop's last sync time

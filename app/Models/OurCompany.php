@@ -27,6 +27,8 @@ class OurCompany extends Model
         'signatory_name',
         'signatory_position',
         'annual_limit',
+        'external_sales_amount',
+        'remaining_limit_override',
         'is_active',
     ];
 
@@ -37,6 +39,8 @@ class OurCompany extends Model
             'tax_system' => TaxSystem::class,
             'bank_details' => 'array',
             'annual_limit' => 'decimal:2',
+            'external_sales_amount' => 'decimal:2',
+            'remaining_limit_override' => 'decimal:2',
             'is_active' => 'boolean',
         ];
     }
@@ -95,9 +99,38 @@ class OurCompany extends Model
 
     // Business Logic
 
+    /**
+     * Get the global limit for this company type from settings
+     */
+    public function getGlobalLimit(): ?float
+    {
+        $settingKey = match ($this->type) {
+            CompanyType::FOP => 'limits.fop.max_amount',
+            CompanyType::TOV => 'limits.tov.max_amount',
+        };
+
+        return Setting::get($settingKey);
+    }
+
+    /**
+     * Check if company has a limit (global or individual)
+     */
     public function hasLimit(): bool
     {
-        return $this->tax_system === TaxSystem::SINGLE_TAX;
+        return $this->getEffectiveLimit() !== null;
+    }
+
+    /**
+     * Get the effective limit: individual annual_limit has priority, otherwise use global limit
+     */
+    public function getEffectiveLimit(): ?float
+    {
+        // Приоритет: индивидуальный лимит > глобальный лимит
+        if ($this->annual_limit && $this->annual_limit > 0) {
+            return (float) $this->annual_limit;
+        }
+
+        return $this->getGlobalLimit();
     }
 
     public function hasVat(): bool
@@ -124,24 +157,66 @@ class OurCompany extends Model
             ->sum('total');
     }
 
-    public function getRemainingLimit(?int $year = null): ?float
+    /**
+     * Get total amount used: paid invoices + external sales
+     */
+    public function getTotalUsedAmount(?int $year = null): float
     {
-        if (!$this->hasLimit() || !$this->annual_limit) {
-            return null;
+        if ($this->remaining_limit_override !== null) {
+            $effectiveLimit = $this->getEffectiveLimit();
+            return $effectiveLimit ? $effectiveLimit - (float) $this->remaining_limit_override : 0;
         }
 
-        return $this->annual_limit - $this->getYearlyInvoicedAmount($year);
+        return $this->getYearlyPaidAmount($year) + (float) $this->external_sales_amount;
     }
 
-    public function getLimitUsagePercent(?int $year = null): ?float
+    /**
+     * Get remaining limit
+     * Formula: if remaining_limit_override is set, use it; otherwise calculate from effective_limit - paid - external_sales
+     */
+    public function getRemainingLimit(?int $year = null): ?float
     {
-        if (!$this->hasLimit() || !$this->annual_limit) {
+        $effectiveLimit = $this->getEffectiveLimit();
+
+        if ($effectiveLimit === null) {
             return null;
         }
 
-        $invoiced = $this->getYearlyInvoicedAmount($year);
+        // Если есть ручное переопределение - использовуем его
+        if ($this->remaining_limit_override !== null) {
+            return (float) $this->remaining_limit_override;
+        }
 
-        return ($invoiced / $this->annual_limit) * 100;
+        // Иначе рассчитываем: Лимит - Оплаченные рахунки - Зовнішні продажи
+        $paidAmount = $this->getYearlyPaidAmount($year);
+        $externalSales = (float) $this->external_sales_amount;
+
+        return $effectiveLimit - $paidAmount - $externalSales;
+    }
+
+    /**
+     * Get limit usage percentage based on paid amounts and external sales
+     */
+    public function getLimitUsagePercent(?int $year = null): ?float
+    {
+        $effectiveLimit = $this->getEffectiveLimit();
+
+        if ($effectiveLimit === null || $effectiveLimit <= 0) {
+            return null;
+        }
+
+        // Если есть override - считаем от него
+        if ($this->remaining_limit_override !== null) {
+            $used = $effectiveLimit - (float) $this->remaining_limit_override;
+            return ($used / $effectiveLimit) * 100;
+        }
+
+        // Иначе считаем от оплаченных + внешних
+        $paidAmount = $this->getYearlyPaidAmount($year);
+        $externalSales = (float) $this->external_sales_amount;
+        $totalUsed = $paidAmount + $externalSales;
+
+        return ($totalUsed / $effectiveLimit) * 100;
     }
 
     public function isLimitExceeded(?int $year = null): bool
@@ -154,7 +229,8 @@ class OurCompany extends Model
     public function isLimitWarning(?int $year = null): bool
     {
         $percent = $this->getLimitUsagePercent($year);
+        $warningThreshold = Setting::get('limits.warning_threshold', 90);
 
-        return $percent !== null && $percent >= 90;
+        return $percent !== null && $percent >= $warningThreshold;
     }
 }

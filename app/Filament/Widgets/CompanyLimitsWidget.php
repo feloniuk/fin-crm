@@ -19,46 +19,73 @@ class CompanyLimitsWidget extends Widget
     public function getCompaniesWithLimits(): array
     {
         return Cache::remember('company_limits', 60, function () {
-            // Get all companies with limits in one query
             $companies = OurCompany::active()
-                ->where('annual_limit', '>', 0)
                 ->orderBy('name')
-                ->get(['id', 'name', 'annual_limit']);
+                ->get(['id', 'name', 'type', 'annual_limit', 'external_sales_amount', 'remaining_limit_override']);
 
             if ($companies->isEmpty()) {
                 return [];
             }
 
-            // Get yearly invoiced amounts for all companies in one query
+            // Filter companies with limits (global or individual)
+            $companies = $companies->filter(function ($company) {
+                return $company->hasLimit();
+            });
+
+            if ($companies->isEmpty()) {
+                return [];
+            }
+
+            // Get yearly PAID invoice amounts for all companies in one query (ИЗМЕНЕНО)
             $year = now()->year;
-            $invoicedAmounts = Invoice::whereYear('invoice_date', $year)
+            $paidAmounts = Invoice::whereYear('invoice_date', $year)
+                ->where('is_paid', true)  // ИЗМЕНЕНО: только оплаченные
                 ->whereIn('our_company_id', $companies->pluck('id'))
                 ->groupBy('our_company_id')
-                ->selectRaw('our_company_id, COALESCE(SUM(total), 0) as total_invoiced')
-                ->pluck('total_invoiced', 'our_company_id');
+                ->selectRaw('our_company_id, COALESCE(SUM(total), 0) as total_paid')
+                ->pluck('total_paid', 'our_company_id');
 
             // Build result array
             $result = [];
             foreach ($companies as $company) {
-                $invoiced = (float) ($invoicedAmounts[$company->id] ?? 0);
-                $limit = (float) $company->annual_limit;
-                $percent = $limit > 0 ? ($invoiced / $limit) * 100 : 0;
-                $remaining = $limit - $invoiced;
+                $effectiveLimit = $company->getEffectiveLimit();
 
-                $colorClass = 'success';
-                if ($percent >= 90) {
-                    $colorClass = 'danger';
-                } elseif ($percent >= 70) {
-                    $colorClass = 'warning';
+                if (!$effectiveLimit) {
+                    continue;
                 }
+
+                $paidInSystem = (float) ($paidAmounts[$company->id] ?? 0);
+                $externalSales = (float) $company->external_sales_amount;
+
+                // Расчет по формуле
+                if ($company->remaining_limit_override !== null) {
+                    $remaining = (float) $company->remaining_limit_override;
+                    $totalUsed = $effectiveLimit - $remaining;
+                } else {
+                    $totalUsed = $paidInSystem + $externalSales;
+                    $remaining = $effectiveLimit - $totalUsed;
+                }
+
+                $percent = $effectiveLimit > 0 ? ($totalUsed / $effectiveLimit) * 100 : 0;
+
+                $colorClass = match (true) {
+                    $percent >= 100 => 'danger',
+                    $percent >= 90 => 'warning',
+                    $percent >= 70 => 'info',
+                    default => 'success',
+                };
 
                 $result[] = [
                     'name' => $company->name,
-                    'invoiced' => $invoiced,
-                    'limit' => $limit,
+                    'type' => $company->type->getLabel(),
+                    'paid_in_system' => $paidInSystem,
+                    'external_sales' => $externalSales,
+                    'total_used' => $totalUsed,
+                    'limit' => $effectiveLimit,
                     'percent' => round($percent, 2),
-                    'remaining' => max(0, $remaining),
+                    'remaining' => $remaining,
                     'colorClass' => $colorClass,
+                    'has_override' => $company->remaining_limit_override !== null,
                 ];
             }
 

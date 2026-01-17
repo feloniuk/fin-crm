@@ -2,8 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Enums\CompanyType;
-use App\Enums\TaxSystem;
 use App\Models\OurCompany;
 use Illuminate\Console\Command;
 
@@ -11,18 +9,19 @@ class CheckLimitsCommand extends Command
 {
     protected $signature = 'limits:check';
 
-    protected $description = 'Перевірити ліміти ФОП компаній та вивести попередження';
+    protected $description = 'Перевірити ліміти компаній та вивести попередження';
 
     public function handle()
     {
         $this->info('🔍 Перевіряємо ліміти компаній...');
 
-        $companies = OurCompany::active()
-            ->where('tax_system', TaxSystem::SINGLE_TAX)
-            ->get();
+        // ИЗМЕНЕНО: Получаем все активные компании с лимитами
+        $companies = OurCompany::active()->get()->filter(function ($company) {
+            return $company->hasLimit();
+        });
 
         if ($companies->isEmpty()) {
-            $this->info('ℹ️ Немає ФОП компаній з лімітами');
+            $this->info('ℹ️ Немає компаній з лімітами');
             return self::SUCCESS;
         }
 
@@ -30,31 +29,40 @@ class CheckLimitsCommand extends Command
         $exceeded_count = 0;
 
         foreach ($companies as $company) {
+            $effectiveLimit = $company->getEffectiveLimit();
+            $remaining = $company->getRemainingLimit();
+            $percent = $company->getLimitUsagePercent();
             $isExceeded = $company->isLimitExceeded();
             $isWarning = $company->isLimitWarning();
-            $percent = $company->getLimitUsagePercent();
-            $remaining = $company->getRemainingLimit();
+
+            // НОВОЕ: Показываем детальную информацию
+            $limitType = $company->annual_limit ? 'індивідуальний' : 'глобальний';
+            $hasOverride = $company->remaining_limit_override !== null ? ' [РУЧНЕ]' : '';
 
             if ($isExceeded) {
-                $this->warn("❌ ПЕРЕВИЩЕНО: {$company->name}");
-                $this->line("   Ліміт: " . number_format($company->annual_limit, 2, ',', ' ') . ' грн');
-                $this->line("   Виписано: " . number_format($company->getYearlyInvoicedAmount(), 2, ',', ' ') . ' грн');
+                $this->warn("❌ ПЕРЕВИЩЕНО: {$company->name}{$hasOverride}");
+                $this->line("   Тип: {$company->type->getLabel()} ({$limitType} ліміт)");
+                $this->line("   Ліміт: " . number_format($effectiveLimit, 2, ',', ' ') . ' грн');
+                $this->line("   Оплачено в системі: " . number_format($company->getYearlyPaidAmount(), 2, ',', ' ') . ' грн');
+                $this->line("   Продажі поза системою: " . number_format($company->external_sales_amount, 2, ',', ' ') . ' грн');
+                $this->line("   Всього використано: " . number_format($company->getTotalUsedAmount(), 2, ',', ' ') . ' грн');
                 $this->line("   Перевищено на: " . number_format(abs($remaining), 2, ',', ' ') . ' грн');
                 $exceeded_count++;
             } elseif ($isWarning) {
-                $this->comment("⚠️ ПОПЕРЕДЖЕННЯ: {$company->name}");
-                $this->line("   Використано: {$percent}% від ліміту");
+                $this->comment("⚠️ ПОПЕРЕДЖЕННЯ: {$company->name}{$hasOverride}");
+                $this->line("   Тип: {$company->type->getLabel()} ({$limitType} ліміт)");
+                $this->line("   Використано: " . round($percent) . "% від ліміту");
                 $this->line("   Залишок: " . number_format($remaining, 2, ',', ' ') . ' грн');
                 $warning_count++;
             } else {
-                $this->info("✅ OK: {$company->name}");
-                $this->line("   Використано: {$percent}% від ліміту");
+                $this->info("✅ OK: {$company->name}{$hasOverride}");
+                $this->line("   Використано: " . round($percent) . "% від ліміту");
             }
 
             $this->line('');
         }
 
-        $this->info("📊 Итого:");
+        $this->info("📊 Підсумок:");
         $this->line("   ✅ Нормально: " . ($companies->count() - $warning_count - $exceeded_count));
         $this->line("   ⚠️ Попередження: {$warning_count}");
         $this->line("   ❌ Перевищено: {$exceeded_count}");

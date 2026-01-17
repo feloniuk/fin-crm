@@ -16,7 +16,8 @@ class PdfInvoiceGenerator implements DocumentGeneratorInterface
         $pdf->setPaper('a4');
         $pdf->setOption(['isPhpEnabled' => true, 'isHtml5ParserEnabled' => true]);
 
-        $fileName = 'invoice_' . $invoice->invoice_number . '_' . time() . '.pdf';
+        $safeNumber = str_replace(['/', '\\'], '-', $invoice->invoice_number);
+        $fileName = 'invoice_' . $safeNumber . '_' . time() . '.pdf';
         $path = storage_path('app/invoices/' . $fileName);
 
         if (!is_dir(dirname($path))) {

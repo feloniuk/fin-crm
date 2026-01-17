@@ -52,24 +52,35 @@ class InvoiceResource extends Resource
                                 "#{$record->external_id} - {$record->customer_name} ({$record->total_amount})"
                             )
                             ->searchable()
+                            ->live()
+                            ->afterStateUpdated(function (Set $set, Get $get) {
+                                $orderId = $get('order_id');
+                                if ($orderId) {
+                                    $order = \App\Models\Order::find($orderId);
+                                    if ($order) {
+                                        // Auto-fill company and VAT from Order if they're set
+                                        if ($order->our_company_id) {
+                                            $set('our_company_id', $order->our_company_id);
+                                        }
+                                        if ($order->with_vat !== null) {
+                                            $set('with_vat', $order->with_vat);
+                                        }
+                                    }
+                                }
+                            })
                             ->visibleOn('create'),
 
                         Forms\Components\Select::make('our_company_id')
                             ->label('Наша компанія')
                             ->options(fn () => OurCompany::active()->pluck('name', 'id'))
                             ->required()
-                            ->live()
-                            ->afterStateUpdated(function (Set $set, Get $get) {
-                                $company = OurCompany::find($get('our_company_id'));
-                                if ($company) {
-                                    $set('with_vat', $company->hasVat());
-                                }
-                            }),
+                            ->searchable(),
 
                         Forms\Components\Toggle::make('with_vat')
                             ->label('З ПДВ 20%')
                             ->default(false)
-                            ->live(),
+                            ->live()
+                            ->helperText('Режим оподаткування для цього рахунку'),
                     ])
                     ->columns(2),
 
@@ -121,7 +132,8 @@ class InvoiceResource extends Resource
                     ->schema([
                         Forms\Components\Repeater::make('items')
                             ->label('Позиції рахунку')
-                            ->relationship(condition: fn () => request()->routeIs('*.edit'))
+                            ->relationship()
+                            ->visibleOn('edit')
                             ->schema([
                                 Forms\Components\TextInput::make('name')
                                     ->label('Товар')
@@ -195,8 +207,8 @@ class InvoiceResource extends Resource
                             ->numeric()
                             ->step(0.01)
                             ->default(0)
-                            ->hidden(fn (Get $get) =>
-                                $get('discount_type') === DiscountType::NONE->value
+                            ->visible(fn (Get $get) =>
+                                !empty($get('discount_type'))
                             )
                             ->live(),
                     ])
@@ -304,7 +316,7 @@ class InvoiceResource extends Resource
                     ->form([
                         Forms\Components\Select::make('counterparty_id')
                             ->label('Контрагент')
-                            ->options(fn () => Counterparty::orderBy('name')->pluck('name', 'id'))
+                            ->relationship('counterparty', 'name')
                             ->searchable(),
                     ])
                     ->query(function ($query, array $data) {
@@ -347,7 +359,7 @@ class InvoiceResource extends Resource
                     ->color('success')
                     ->url(fn (Invoice $record) => $record->excel_path ? route('invoice.download-excel', $record) : null)
                     ->openUrlInNewTab()
-                    ->visible(fn (Invoice $record) => $record->excel_path && file_exists($record->excel_path)),
+                    ->visible(fn (Invoice $record) => !empty($record->excel_path)),
 
                 Tables\Actions\Action::make('downloadPdf')
                     ->label('PDF')
@@ -355,7 +367,7 @@ class InvoiceResource extends Resource
                     ->color('danger')
                     ->url(fn (Invoice $record) => $record->pdf_path ? route('invoice.download-pdf', $record) : null)
                     ->openUrlInNewTab()
-                    ->visible(fn (Invoice $record) => $record->pdf_path && file_exists($record->pdf_path)),
+                    ->visible(fn (Invoice $record) => !empty($record->pdf_path)),
 
                 Tables\Actions\Action::make('markAsPaid')
                     ->label('Оплачено')

@@ -14,6 +14,7 @@ use Filament\Widgets;
 use App\Filament\Widgets\StatsOverviewWidget;
 use App\Filament\Widgets\CompanyLimitsWidget;
 use App\Filament\Widgets\RecentOrdersWidget;
+use App\Filament\Pages\CompanyLimitsSettings;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -38,11 +39,11 @@ class AdminPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
                 Pages\Dashboard::class,
+                CompanyLimitsSettings::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 StatsOverviewWidget::class,
-                CompanyLimitsWidget::class,
                 RecentOrdersWidget::class,
             ])
             ->middleware([
