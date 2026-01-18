@@ -73,6 +73,8 @@ class CreateInvoice extends CreateRecord
 
         $this->form->fill([
             'order_id' => $this->order->id,
+            'our_company_id' => $this->order->our_company_id,
+            'with_vat' => $this->order->with_vat ?? false,
             'counterparty_id' => $counterparty?->id,
             'items' => $items,
         ]);

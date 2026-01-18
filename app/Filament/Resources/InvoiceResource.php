@@ -130,63 +130,24 @@ class InvoiceResource extends Resource
 
                 Forms\Components\Section::make('Товари')
                     ->schema([
+                        // Repeater для СТВОРЕННЯ (без relationship)
+                        Forms\Components\Repeater::make('items')
+                            ->label('Позиції рахунку')
+                            ->visibleOn('create')
+                            ->schema(self::getItemsSchema())
+                            ->columns(12)
+                            ->reorderable()
+                            ->collapsible()
+                            ->columnSpanFull()
+                            ->defaultItems(0)
+                            ->live(),
+
+                        // Repeater для РЕДАГУВАННЯ (з relationship)
                         Forms\Components\Repeater::make('items')
                             ->label('Позиції рахунку')
                             ->relationship()
                             ->visibleOn('edit')
-                            ->schema([
-                                Forms\Components\TextInput::make('name')
-                                    ->label('Товар')
-                                    ->required()
-                                    ->columnSpan(3),
-
-                                Forms\Components\TextInput::make('quantity')
-                                    ->label('Кількість')
-                                    ->required()
-                                    ->numeric()
-                                    ->default(1)
-                                    ->step(0.001)
-                                    ->columnSpan(1)
-                                    ->live(debounce: 500)
-                                    ->afterStateUpdated(fn (Set $set, Get $get) =>
-                                        self::recalculateItem($set, $get)
-                                    ),
-
-                                Forms\Components\TextInput::make('unit')
-                                    ->label('Од.')
-                                    ->default('шт.')
-                                    ->columnSpan(1),
-
-                                Forms\Components\TextInput::make('unit_price')
-                                    ->label('Ціна')
-                                    ->required()
-                                    ->numeric()
-                                    ->step(0.01)
-                                    ->columnSpan(2)
-                                    ->live(debounce: 500)
-                                    ->afterStateUpdated(fn (Set $set, Get $get) =>
-                                        self::recalculateItem($set, $get)
-                                    ),
-
-                                Forms\Components\TextInput::make('discount')
-                                    ->label('Знижка')
-                                    ->numeric()
-                                    ->step(0.01)
-                                    ->default(0)
-                                    ->columnSpan(2)
-                                    ->live(debounce: 500)
-                                    ->afterStateUpdated(fn (Set $set, Get $get) =>
-                                        self::recalculateItem($set, $get)
-                                    ),
-
-                                Forms\Components\TextInput::make('total')
-                                    ->label('Сума')
-                                    ->disabled()
-                                    ->formatStateUsing(fn ($state) =>
-                                        number_format($state, 2, ',', ' ')
-                                    )
-                                    ->columnSpan(2),
-                            ])
+                            ->schema(self::getItemsSchema())
                             ->columns(12)
                             ->reorderable()
                             ->collapsible()
@@ -408,6 +369,64 @@ class InvoiceResource extends Resource
             'create' => Pages\CreateInvoice::route('/create'),
             'view' => Pages\ViewInvoice::route('/{record}'),
             'edit' => Pages\EditInvoice::route('/{record}/edit'),
+        ];
+    }
+
+    protected static function getItemsSchema(): array
+    {
+        return [
+            Forms\Components\TextInput::make('name')
+                ->label('Товар')
+                ->required()
+                ->columnSpan(3),
+
+            Forms\Components\TextInput::make('quantity')
+                ->label('Кількість')
+                ->required()
+                ->numeric()
+                ->default(1)
+                ->step(0.001)
+                ->columnSpan(1)
+                ->live(debounce: 500)
+                ->afterStateUpdated(fn (Set $set, Get $get) =>
+                    self::recalculateItem($set, $get)
+                ),
+
+            Forms\Components\TextInput::make('unit')
+                ->label('Од.')
+                ->default('шт.')
+                ->columnSpan(1),
+
+            Forms\Components\TextInput::make('unit_price')
+                ->label('Ціна')
+                ->required()
+                ->numeric()
+                ->step(0.01)
+                ->columnSpan(2)
+                ->live(debounce: 500)
+                ->afterStateUpdated(fn (Set $set, Get $get) =>
+                    self::recalculateItem($set, $get)
+                ),
+
+            Forms\Components\TextInput::make('discount')
+                ->label('Знижка')
+                ->numeric()
+                ->step(0.01)
+                ->default(0)
+                ->columnSpan(2)
+                ->live(debounce: 500)
+                ->afterStateUpdated(fn (Set $set, Get $get) =>
+                    self::recalculateItem($set, $get)
+                ),
+
+            Forms\Components\TextInput::make('total')
+                ->label('Сума')
+                ->disabled()
+                ->dehydrated()
+                ->formatStateUsing(fn ($state) =>
+                    number_format((float) ($state ?? 0), 2, ',', ' ')
+                )
+                ->columnSpan(2),
         ];
     }
 

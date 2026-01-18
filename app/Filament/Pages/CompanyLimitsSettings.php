@@ -7,6 +7,7 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Pages\Page;
 use Filament\Notifications\Notification;
+use Illuminate\Support\HtmlString;
 
 class CompanyLimitsSettings extends Page
 {
@@ -74,7 +75,7 @@ class CompanyLimitsSettings extends Page
                     ->schema([
                         Forms\Components\Placeholder::make('info')
                             ->label('')
-                            ->content(view('filament.pages.company-limits-settings-info')),
+                            ->content(new HtmlString(view('filament.pages.company-limits-settings-info')->render())),
                     ])
                     ->collapsible()
                     ->collapsed(),
