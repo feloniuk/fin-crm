@@ -35,6 +35,19 @@ class AdminPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Amber,
             ])
+            ->maxContentWidth(\Filament\Support\Enums\MaxWidth::Full)
+            ->renderHook(
+                'panels::head.end',
+                fn () => '<style>
+                    /* Fix horizontal scroll in tables on desktop */
+                    @media (min-width: 1024px) {
+                        .fi-ta-table { width: 100% !important; table-layout: auto !important; }
+                        .fi-ta-cell, .fi-ta-header-cell { white-space: normal !important; word-break: break-word !important; }
+                        .fi-ta-actions-cell { white-space: nowrap !important; }
+                    }
+                    .fi-main { min-width: 0 !important; }
+                </style>'
+            )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([

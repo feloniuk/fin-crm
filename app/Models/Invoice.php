@@ -191,22 +191,30 @@ class Invoice extends Model
         ]);
     }
 
-    public static function getNextNumber(OurCompany $company): string
+    /**
+     * Generate next invoice number in format DDMMYYYYNN
+     * DD - day, MM - month, YYYY - year, NN - sequential number
+     */
+    public static function getNextNumber(): string
     {
-        $year = now()->year;
-        $prefix = "INV-{$company->id}-{$year}-";
+        $today = now();
+        $datePrefix = $today->format('dmY'); // DDMMYYYY
 
-        $lastNumber = static::where('invoice_number', 'like', $prefix . '%')
-            ->orderByRaw('CAST(SUBSTRING(invoice_number, -5) AS UNSIGNED) DESC')
-            ->value('invoice_number');
+        // Get the last invoice number for today
+        $lastInvoice = static::where('invoice_number', 'like', $datePrefix . '%')
+            ->orderBy('invoice_number', 'desc')
+            ->lockForUpdate()
+            ->first();
 
-        if ($lastNumber) {
-            $currentNumber = (int) substr($lastNumber, -5);
-            $nextNumber = $currentNumber + 1;
+        if ($lastInvoice) {
+            // Extract the sequence number (last 2+ digits after date)
+            $lastSequence = (int) substr($lastInvoice->invoice_number, 8);
+            $nextSequence = $lastSequence + 1;
         } else {
-            $nextNumber = 1;
+            $nextSequence = 1;
         }
 
-        return $prefix . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+        // Format: DDMMYYYY + sequence (min 2 digits)
+        return $datePrefix . str_pad($nextSequence, 2, '0', STR_PAD_LEFT);
     }
 }

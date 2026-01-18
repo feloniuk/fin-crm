@@ -10,6 +10,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
 {
@@ -19,11 +20,16 @@ class UserResource extends Resource
 
     protected static ?string $navigationGroup = 'Налаштування';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 10;
 
     protected static ?string $modelLabel = 'Користувач';
 
     protected static ?string $pluralModelLabel = 'Користувачі';
+
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->isAdmin() ?? false;
+    }
 
     public static function form(Form $form): Form
     {
@@ -32,7 +38,7 @@ class UserResource extends Resource
                 Forms\Components\Section::make('Основна інформація')
                     ->schema([
                         Forms\Components\TextInput::make('name')
-                            ->label('Ім\'я')
+                            ->label("Ім'я")
                             ->required()
                             ->maxLength(255),
 
@@ -40,48 +46,42 @@ class UserResource extends Resource
                             ->label('Email')
                             ->email()
                             ->required()
-                            ->unique(User::class, 'email', ignoreRecord: true),
-
-                        Forms\Components\TextInput::make('password')
-                            ->label('Пароль')
-                            ->password()
-                            ->required(fn (string $context): bool => $context === 'create')
-                            ->dehydrated(fn ($state) => filled($state))
-                            ->minLength(8)
-                            ->helperText(fn (string $context): ?string =>
-                                $context === 'edit' ? 'Залиште порожнім, щоб не змінювати пароль' : null
-                            ),
+                            ->unique(ignoreRecord: true)
+                            ->maxLength(255),
 
                         Forms\Components\Select::make('role')
                             ->label('Роль')
                             ->options(UserRole::class)
                             ->required()
-                            ->native(false),
+                            ->default(UserRole::MANAGER),
                     ])
                     ->columns(2),
 
-                Forms\Components\Section::make('Статистика')
+                Forms\Components\Section::make('Пароль')
                     ->schema([
-                        Forms\Components\Placeholder::make('email_verified_at')
-                            ->label('Email підтверджений')
-                            ->content(fn (?User $record): string =>
-                                $record?->email_verified_at?->format('d.m.Y H:i:s') ?? 'Не підтверджений'
-                            ),
+                        Forms\Components\TextInput::make('password')
+                            ->label('Пароль')
+                            ->password()
+                            ->revealable()
+                            ->required(fn (string $operation): bool => $operation === 'create')
+                            ->dehydrateStateUsing(fn ($state) => $state ? Hash::make($state) : null)
+                            ->dehydrated(fn ($state) => filled($state))
+                            ->helperText(fn (string $operation): string =>
+                                $operation === 'edit'
+                                    ? 'Залиште порожнім, щоб не змінювати пароль'
+                                    : 'Мінімум 8 символів'
+                            )
+                            ->minLength(8),
 
-                        Forms\Components\Placeholder::make('created_at')
-                            ->label('Створено')
-                            ->content(fn (?User $record): string =>
-                                $record?->created_at?->format('d.m.Y H:i:s') ?? '-'
-                            ),
-
-                        Forms\Components\Placeholder::make('updated_at')
-                            ->label('Оновлено')
-                            ->content(fn (?User $record): string =>
-                                $record?->updated_at?->format('d.m.Y H:i:s') ?? '-'
-                            ),
+                        Forms\Components\TextInput::make('password_confirmation')
+                            ->label('Підтвердження пароля')
+                            ->password()
+                            ->revealable()
+                            ->required(fn (string $operation): bool => $operation === 'create')
+                            ->same('password')
+                            ->dehydrated(false),
                     ])
-                    ->columns(3)
-                    ->visibleOn('edit'),
+                    ->columns(2),
             ]);
     }
 
@@ -90,7 +90,7 @@ class UserResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
-                    ->label('Ім\'я')
+                    ->label("Ім'я")
                     ->searchable()
                     ->sortable(),
 
@@ -104,20 +104,15 @@ class UserResource extends Resource
                     ->badge()
                     ->sortable(),
 
-                Tables\Columns\IconColumn::make('email_verified_at')
-                    ->label('Email підтверджений')
-                    ->boolean()
-                    ->trueIcon('heroicon-o-check-badge')
-                    ->falseIcon('heroicon-o-minus-circle'),
-
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Створено')
-                    ->dateTime('d.m.Y')
-                    ->sortable(),
+                    ->dateTime('d.m.Y H:i')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('updated_at')
                     ->label('Оновлено')
-                    ->dateTime('d.m.Y')
+                    ->dateTime('d.m.Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
@@ -128,10 +123,21 @@ class UserResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\DeleteAction::make()
+                    ->before(function (User $record) {
+                        if ($record->id === auth()->id()) {
+                            throw new \Exception('Ви не можете видалити себе');
+                        }
+                    }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->before(function ($records) {
+                            if ($records->contains('id', auth()->id())) {
+                                throw new \Exception('Ви не можете видалити себе');
+                            }
+                        }),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
@@ -139,9 +145,7 @@ class UserResource extends Resource
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     public static function getPages(): array

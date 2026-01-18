@@ -65,8 +65,8 @@ class CreateInvoiceAction
                 $counterparty->save();
             }
 
-            // Generate invoice number
-            $invoiceNumber = $this->generateInvoiceNumber($company);
+            // Generate invoice number (format: DDMMYYYYNN)
+            $invoiceNumber = Invoice::getNextNumber();
 
             // Create invoice
             $invoice = Invoice::create([
@@ -129,33 +129,4 @@ class CreateInvoiceAction
         });
     }
 
-    private function generateInvoiceNumber(OurCompany $company): string
-    {
-        // Get company abbreviation from first letters
-        $abbr = $this->getCompanyAbbreviation($company->name);
-
-        $year = now()->year;
-
-        // Get the count of invoices for this company in this year
-        $count = Invoice::where('our_company_id', $company->id)
-            ->whereYear('invoice_date', $year)
-            ->count() + 1;
-
-        // Format: {abbr}-{number}/{year}
-        return sprintf('%s-%04d/%d', $abbr, $count, $year);
-    }
-
-    private function getCompanyAbbreviation(string $name): string
-    {
-        $words = explode(' ', trim($name));
-        $abbr = '';
-
-        foreach ($words as $word) {
-            if (!empty($word)) {
-                $abbr .= mb_strtoupper(mb_substr($word, 0, 1));
-            }
-        }
-
-        return $abbr ?: 'КО';
-    }
 }
