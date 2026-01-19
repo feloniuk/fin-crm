@@ -87,20 +87,15 @@ class CreateInvoiceAction
 
             // Create invoice items
             foreach ($items as $itemData) {
-                $itemTotal = $this->calculator->calculateItemTotal(
-                    (float) $itemData['quantity'],
-                    (float) $itemData['unit_price'],
-                    (float) ($itemData['discount'] ?? 0)
-                );
-
+                // InvoiceItem автоматично розрахує subtotal, discount_amount, total
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
                     'name' => $itemData['name'],
                     'quantity' => $itemData['quantity'],
                     'unit' => $itemData['unit'] ?? 'шт.',
                     'unit_price' => $itemData['unit_price'],
-                    'discount' => $itemData['discount'] ?? 0,
-                    'total' => $itemTotal,
+                    'discount_type' => $itemData['discount_type'] ?? null,
+                    'discount_value' => $itemData['discount_value'] ?? 0,
                 ]);
             }
 

@@ -408,12 +408,28 @@ class InvoiceResource extends Resource
                     self::recalculateItem($set, $get)
                 ),
 
-            Forms\Components\TextInput::make('discount')
-                ->label('Знижка')
+            Forms\Components\Select::make('discount_type')
+                ->label('Тип знижки')
+                ->options([
+                    '' => 'Без знижки',
+                    'percent' => 'Відсоток (%)',
+                    'fixed' => 'Сума (грн)',
+                ])
+                ->default('')
+                ->columnSpan(2)
+                ->live()
+                ->afterStateUpdated(function (Set $set, Get $get) {
+                    $set('discount_value', 0);
+                    self::recalculateItem($set, $get);
+                }),
+
+            Forms\Components\TextInput::make('discount_value')
+                ->label(fn (Get $get) => $get('discount_type') === 'percent' ? 'Знижка (%)' : 'Знижка (грн)')
                 ->numeric()
                 ->step(0.01)
                 ->default(0)
-                ->columnSpan(2)
+                ->columnSpan(1)
+                ->visible(fn (Get $get): bool => !empty($get('discount_type')))
                 ->live(debounce: 500)
                 ->afterStateUpdated(fn (Set $set, Get $get) =>
                     self::recalculateItem($set, $get)
@@ -434,9 +450,19 @@ class InvoiceResource extends Resource
     {
         $quantity = (float) ($get('quantity') ?? 0);
         $unitPrice = (float) ($get('unit_price') ?? 0);
-        $discount = (float) ($get('discount') ?? 0);
+        $discountType = $get('discount_type');
+        $discountValue = (float) ($get('discount_value') ?? 0);
 
-        $total = ($quantity * $unitPrice) - $discount;
-        $set('total', max(0, $total));
+        $subtotal = $quantity * $unitPrice;
+
+        $discountAmount = 0;
+        if ($discountType === 'percent' && $discountValue > 0) {
+            $discountAmount = $subtotal * ($discountValue / 100);
+        } elseif ($discountType === 'fixed' && $discountValue > 0) {
+            $discountAmount = min($discountValue, $subtotal);
+        }
+
+        $total = max(0, $subtotal - $discountAmount);
+        $set('total', $total);
     }
 }

@@ -15,9 +15,12 @@ class InvoiceItem extends Model
         'invoice_id',
         'name',
         'quantity',
+        'subtotal',
         'unit',
         'unit_price',
-        'discount',
+        'discount_type',
+        'discount_value',
+        'discount_amount',
         'total',
     ];
 
@@ -25,8 +28,10 @@ class InvoiceItem extends Model
     {
         return [
             'quantity' => 'decimal:3',
+            'subtotal' => 'decimal:2',
             'unit_price' => 'decimal:2',
-            'discount' => 'decimal:2',
+            'discount_value' => 'decimal:2',
+            'discount_amount' => 'decimal:2',
             'total' => 'decimal:2',
         ];
     }
@@ -45,7 +50,7 @@ class InvoiceItem extends Model
         parent::boot();
 
         static::saving(function (self $item) {
-            $item->total = $item->calculateTotal();
+            $item->calculateAmounts();
         });
 
         static::saved(function (self $item) {
@@ -59,9 +64,27 @@ class InvoiceItem extends Model
 
     // Helpers
 
-    public function calculateTotal(): float
+    /**
+     * Розрахувати суми для цього товару
+     */
+    public function calculateAmounts(): void
     {
-        return round(($this->quantity * $this->unit_price) - $this->discount, 2);
+        // Розраховуємо subtotal
+        $this->subtotal = (float) $this->quantity * (float) $this->unit_price;
+
+        // Розраховуємо discount_amount залежно від типу знижки
+        $discountAmount = 0;
+        if ($this->discount_type === 'percent' && $this->discount_value) {
+            $discountAmount = $this->subtotal * ((float) $this->discount_value / 100);
+        } elseif ($this->discount_type === 'fixed' && $this->discount_value) {
+            $discountAmount = (float) $this->discount_value;
+        }
+
+        // Перевіряємо, щоб знижка не була більше за subtotal
+        $this->discount_amount = min($discountAmount, $this->subtotal);
+
+        // Розраховуємо total
+        $this->total = max(0, $this->subtotal - $this->discount_amount);
     }
 
     public function getFormattedQuantity(): string

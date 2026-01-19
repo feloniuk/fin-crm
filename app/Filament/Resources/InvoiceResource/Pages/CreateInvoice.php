@@ -53,7 +53,8 @@ class CreateInvoice extends CreateRecord
                     'quantity' => $item->quantity,
                     'unit' => 'шт.',
                     'unit_price' => $item->unit_price,
-                    'discount' => $item->discount_amount,
+                    'discount_type' => $item->discount_type,
+                    'discount_value' => $item->discount_value,
                     'total' => $item->total,
                 ];
             })->toArray();
@@ -65,7 +66,8 @@ class CreateInvoice extends CreateRecord
                     'quantity' => $item['quantity'],
                     'unit' => 'шт.',
                     'unit_price' => $item['unit_price'],
-                    'discount' => 0,
+                    'discount_type' => null,
+                    'discount_value' => 0,
                     'total' => $item['quantity'] * $item['unit_price'],
                 ];
             })->toArray();

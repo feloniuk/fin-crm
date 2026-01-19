@@ -117,7 +117,8 @@ class OrderResource extends Resource
 
                         Forms\Components\Toggle::make('with_vat')
                             ->label('З ПДВ')
-                            ->required(fn (Order $record): bool => $record->status->canCreateInvoice())
+                            ->default(false)
+                            ->dehydrateStateUsing(fn ($state) => (bool) $state)
                             ->helperText('Чи буде рахунок з ПДВ (20%)')
                             ->visibleOn('edit'),
                     ])
@@ -310,7 +311,7 @@ class OrderResource extends Resource
 
                             Forms\Components\Toggle::make('with_vat')
                                 ->label('З ПДВ')
-                                ->required()
+                                ->default(false)
                                 ->helperText('Чи будуть рахунки з ПДВ (20%)'),
                         ])
                         ->action(function ($records, array $data) {
@@ -320,7 +321,7 @@ class OrderResource extends Resource
                                 if (!$record->invoice) {
                                     $record->update([
                                         'our_company_id' => $data['our_company_id'],
-                                        'with_vat' => $data['with_vat'],
+                                        'with_vat' => (bool) ($data['with_vat'] ?? false),
                                     ]);
                                     $updated++;
                                 }

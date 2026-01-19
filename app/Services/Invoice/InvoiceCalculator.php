@@ -11,9 +11,21 @@ class InvoiceCalculator
         foreach ($items as $item) {
             $quantity = (float) ($item['quantity'] ?? 0);
             $unitPrice = (float) ($item['unit_price'] ?? 0);
-            $discount = (float) ($item['discount'] ?? 0);
 
-            $lineTotal = ($quantity * $unitPrice) - $discount;
+            $lineSubtotal = $quantity * $unitPrice;
+
+            // Розрахунок знижки залежно від типу
+            $discountType = $item['discount_type'] ?? null;
+            $discountValue = (float) ($item['discount_value'] ?? 0);
+
+            $discountAmount = 0;
+            if ($discountType === 'percent' && $discountValue > 0) {
+                $discountAmount = $lineSubtotal * ($discountValue / 100);
+            } elseif ($discountType === 'fixed' && $discountValue > 0) {
+                $discountAmount = min($discountValue, $lineSubtotal);
+            }
+
+            $lineTotal = $lineSubtotal - $discountAmount;
             $subtotal += $lineTotal;
         }
 
@@ -34,9 +46,18 @@ class InvoiceCalculator
         return round($subtotal + $vat - $discountValue, 2);
     }
 
-    public function calculateItemTotal(float $quantity, float $unitPrice, float $discount): float
+    public function calculateItemDiscount(float $subtotal, ?string $discountType, float $discountValue): float
     {
-        return round(($quantity * $unitPrice) - $discount, 2);
+        if (!$discountType || $discountValue <= 0) {
+            return 0;
+        }
+
+        if ($discountType === 'percent') {
+            return round($subtotal * ($discountValue / 100), 2);
+        }
+
+        // fixed
+        return round(min($discountValue, $subtotal), 2);
     }
 
     public function calculateInvoice(array $items, bool $withVat, float $globalDiscount = 0): array
