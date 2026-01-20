@@ -43,7 +43,8 @@ class ShopResource extends Resource
                             ->label('Тип магазину')
                             ->options(ShopType::class)
                             ->required()
-                            ->native(false),
+                            ->native(false)
+                            ->live(),
 
                         Forms\Components\Toggle::make('is_active')
                             ->label('Активний')
@@ -51,16 +52,45 @@ class ShopResource extends Resource
                     ])
                     ->columns(2),
 
-                Forms\Components\Section::make('API налаштування')
+                Forms\Components\Section::make('API налаштування Horoshop')
                     ->schema([
-                        Forms\Components\KeyValue::make('api_credentials')
-                            ->label('API credentials')
-                            ->keyLabel('Параметр')
-                            ->valueLabel('Значення')
-                            ->addActionLabel('Додати параметр')
-                            ->reorderable()
-                            ->columnSpanFull(),
-                    ]),
+                        Forms\Components\TextInput::make('api_credentials.shop_url')
+                            ->label('URL магазину')
+                            ->placeholder('myshop.horoshop.ua')
+                            ->helperText('Домен вашого магазину без https://')
+                            ->required()
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('api_credentials.login')
+                            ->label('API Логін')
+                            ->placeholder('api')
+                            ->helperText('Логін для API (зазвичай "api")')
+                            ->required()
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('api_credentials.password')
+                            ->label('API Пароль')
+                            ->password()
+                            ->revealable()
+                            ->helperText('Пароль для доступу до API')
+                            ->required()
+                            ->maxLength(255),
+                    ])
+                    ->columns(1)
+                    ->visible(fn (Forms\Get $get): bool => $get('type') === ShopType::HOROSHOP->value),
+
+                Forms\Components\Section::make('API налаштування Prom.ua')
+                    ->schema([
+                        Forms\Components\TextInput::make('api_credentials.api_token')
+                            ->label('API Token')
+                            ->password()
+                            ->revealable()
+                            ->helperText('Bearer токен для доступу до Prom.ua API')
+                            ->required()
+                            ->maxLength(255),
+                    ])
+                    ->columns(1)
+                    ->visible(fn (Forms\Get $get): bool => $get('type') === ShopType::PROM_UA->value),
 
                 Forms\Components\Section::make('Статистика')
                     ->schema([

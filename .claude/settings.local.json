@@ -25,7 +25,10 @@
       "Bash(netstat:*)",
       "Bash(kill:*)",
       "Bash(wmic process where \"name=''php.exe''\" delete)",
-      "Bash(composer show:*)"
+      "Bash(composer show:*)",
+      "WebFetch(domain:horoshop.notion.site)",
+      "WebSearch",
+      "WebFetch(domain:horoshop.atlassian.net)"
     ]
   }
 }

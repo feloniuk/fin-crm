@@ -21,7 +21,7 @@ class PromUaApiClient implements ShopApiClientInterface
     {
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->credentials->apiKey,
+                'Authorization' => 'Bearer ' . $this->credentials->apiToken,
             ])->timeout(10)->get('https://my.prom.ua/api/v1/me');
 
             if ($response->successful()) {
@@ -50,7 +50,7 @@ class PromUaApiClient implements ShopApiClientInterface
 
             while ($hasMore) {
                 $response = Http::withHeaders([
-                    'Authorization' => 'Bearer ' . $this->credentials->apiKey,
+                    'Authorization' => 'Bearer ' . $this->credentials->apiToken,
                 ])->timeout(30)->get('https://my.prom.ua/api/v1/orders/list', [
                     'updated_from' => $since->toIso8601String(),
                     'limit' => 100,
@@ -84,7 +84,7 @@ class PromUaApiClient implements ShopApiClientInterface
     {
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->credentials->apiKey,
+                'Authorization' => 'Bearer ' . $this->credentials->apiToken,
             ])->timeout(10)->get("https://my.prom.ua/api/v1/orders/{$externalId}");
 
             if ($response->successful()) {

@@ -18,13 +18,45 @@ class OrderDTO
 
     public static function fromArray(array $data): self
     {
+        // Horoshop формат: order_id, client_fio, client_phone, comment, total_sum, products
+        // Prom.ua формат: id, client_first_name+client_last_name, phone, comment, price, products
+
+        $externalId = (string) ($data['order_id'] ?? $data['external_id'] ?? $data['id'] ?? '');
+
+        // Имя клиента
+        $customerName = $data['customer_name']
+            ?? $data['client_fio']
+            ?? $data['client_name']
+            ?? ($data['customer']['name'] ?? null)
+            ?? trim(($data['client_first_name'] ?? '') . ' ' . ($data['client_last_name'] ?? ''))
+            ?? '';
+
+        // Телефон клиента
+        $customerPhone = $data['customer_phone']
+            ?? $data['client_phone']
+            ?? $data['phone']
+            ?? ($data['customer']['phone'] ?? '')
+            ?? '';
+
+        // Комментарий
+        $customerComment = $data['customer_comment']
+            ?? $data['comment']
+            ?? $data['client_comment']
+            ?? '';
+
+        // Сумма заказа (Horoshop: total_sum, Prom: price)
+        $totalAmount = (float) ($data['total_amount'] ?? $data['total_sum'] ?? $data['total'] ?? $data['price'] ?? 0);
+
+        // Товары (Horoshop: products, Prom: products)
+        $items = collect($data['items'] ?? $data['products'] ?? []);
+
         return new self(
-            externalId: (string) $data['external_id'] ?? (string) $data['id'] ?? '',
-            customerName: $data['customer_name'] ?? $data['customer']['name'] ?? '',
-            customerPhone: $data['customer_phone'] ?? $data['customer']['phone'] ?? '',
-            customerComment: $data['customer_comment'] ?? $data['comment'] ?? '',
-            totalAmount: (float) ($data['total_amount'] ?? $data['total'] ?? 0),
-            items: collect($data['items'] ?? $data['products'] ?? []),
+            externalId: $externalId,
+            customerName: $customerName,
+            customerPhone: $customerPhone,
+            customerComment: $customerComment,
+            totalAmount: $totalAmount,
+            items: $items,
             rawData: $data,
         );
     }

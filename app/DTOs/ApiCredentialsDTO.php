@@ -5,18 +5,23 @@ namespace App\DTOs;
 class ApiCredentialsDTO
 {
     public function __construct(
-        public readonly string $apiKey,
-        public readonly string $apiSecret = '',
+        // Horoshop credentials
+        public readonly string $login = '',
+        public readonly string $password = '',
         public readonly string $shopUrl = '',
+        // Prom.ua credentials
+        public readonly string $apiToken = '',
+        // Additional data
         public readonly array $additionalData = [],
     ) {}
 
     public static function fromArray(array $data): self
     {
         return new self(
-            apiKey: $data['api_key'] ?? '',
-            apiSecret: $data['api_secret'] ?? '',
+            login: $data['login'] ?? '',
+            password: $data['password'] ?? '',
             shopUrl: $data['shop_url'] ?? '',
+            apiToken: $data['api_token'] ?? $data['api_key'] ?? '',
             additionalData: $data,
         );
     }
@@ -24,10 +29,10 @@ class ApiCredentialsDTO
     public function toArray(): array
     {
         return [
-            'api_key' => $this->apiKey,
-            'api_secret' => $this->apiSecret,
+            'login' => $this->login,
+            'password' => $this->password,
             'shop_url' => $this->shopUrl,
-            ...$this->additionalData,
+            'api_token' => $this->apiToken,
         ];
     }
 }

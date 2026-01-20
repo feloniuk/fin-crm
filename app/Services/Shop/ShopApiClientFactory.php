@@ -14,8 +14,8 @@ class ShopApiClientFactory
         $credentials = ApiCredentialsDTO::fromArray($shop->api_credentials);
 
         return match ($shop->type) {
-            ShopType::Horoshop => new HoroshopApiClient($credentials),
-            ShopType::PromUa => new PromUaApiClient($credentials),
+            ShopType::HOROSHOP => new HoroshopApiClient($credentials),
+            ShopType::PROM_UA => new PromUaApiClient($credentials),
         };
     }
 
@@ -24,8 +24,8 @@ class ShopApiClientFactory
         $credentialsDTO = ApiCredentialsDTO::fromArray($credentials);
 
         return match ($type) {
-            ShopType::Horoshop => new HoroshopApiClient($credentialsDTO),
-            ShopType::PromUa => new PromUaApiClient($credentialsDTO),
+            ShopType::HOROSHOP => new HoroshopApiClient($credentialsDTO),
+            ShopType::PROM_UA => new PromUaApiClient($credentialsDTO),
         };
     }
 }
