@@ -12,6 +12,7 @@ use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\HtmlString;
 
 class OurCompanyResource extends Resource
 {
@@ -201,34 +202,36 @@ class OurCompanyResource extends Resource
 
                         Forms\Components\Placeholder::make('remaining_limit')
                             ->label('Залишок ліміту')
-                            ->content(function (?OurCompany $record): string {
+                            ->content(function (?OurCompany $record) {
                                 if (!$record) {
-                                    return '0,00 грн';
+                                    return new HtmlString('0,00 грн');
                                 }
 
                                 $remaining = $record->getRemainingLimit();
                                 if ($remaining === null) {
-                                    return 'Без ліміту';
+                                    return new HtmlString('Без ліміту');
                                 }
 
                                 $color = $remaining < 0 ? 'text-red-600' : 'text-green-600';
                                 $value = number_format(abs($remaining), 2, ',', ' ') . ' грн';
 
-                                return $remaining < 0
+                                $html = $remaining < 0
                                     ? "<span class='{$color}'>Перевищено на {$value}</span>"
                                     : "<span class='{$color}'>{$value}</span>";
+
+                                return new HtmlString($html);
                             }),
 
                         Forms\Components\Placeholder::make('limit_usage')
                             ->label('Використання ліміту')
-                            ->content(function (?OurCompany $record): string {
+                            ->content(function (?OurCompany $record) {
                                 if (!$record) {
-                                    return '0%';
+                                    return new HtmlString('0%');
                                 }
 
                                 $percent = $record->getLimitUsagePercent();
                                 if ($percent === null) {
-                                    return 'Без ліміту';
+                                    return new HtmlString('Без ліміту');
                                 }
 
                                 $color = match (true) {
@@ -237,8 +240,10 @@ class OurCompanyResource extends Resource
                                     default => 'text-green-600',
                                 };
 
-                                return "<span class='{$color} font-semibold'>" .
-                                       round($percent) . "%</span>";
+                                $html = "<span class='{$color} font-semibold'>" .
+                                        round($percent) . "%</span>";
+
+                                return new HtmlString($html);
                             }),
 
                         Forms\Components\Placeholder::make('override_status')
