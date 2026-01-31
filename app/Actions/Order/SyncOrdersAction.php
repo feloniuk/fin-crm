@@ -5,6 +5,7 @@ namespace App\Actions\Order;
 use App\Enums\OrderStatus;
 use App\Events\OrderSynced;
 use App\Events\SyncFailed;
+use App\Models\Counterparty;
 use App\Models\Order;
 use App\Models\Shop;
 use App\Services\Shop\ShopApiClientFactory;
@@ -102,6 +103,9 @@ class SyncOrdersAction
 
                 // Синхронізувати items замовлення
                 $syncOrderItems->execute($existingOrder);
+
+                // Синхронізувати контрагента з даних замовлення
+                $this->syncCounterpartyFromOrder($existingOrder, $orderDTO);
             }
 
             // Update shop's last sync time
@@ -117,6 +121,41 @@ class SyncOrdersAction
         } catch (\Throwable $e) {
             // Dispatch failure event
             SyncFailed::dispatch($shop, $e->getMessage());
+        }
+    }
+
+    /**
+     * Синхронізувати контрагента з даних замовлення
+     */
+    private function syncCounterpartyFromOrder(Order $order, $orderDTO): void
+    {
+        // Шукаємо існуючого контрагента за ім'ям та телефоном
+        $counterparty = Counterparty::where('name', $order->customer_name)
+            ->where('phone', $order->customer_phone)
+            ->first();
+
+        if (!$counterparty) {
+            // Створюємо новий контрагент
+            $counterparty = Counterparty::create([
+                'name' => $order->customer_name,
+                'phone' => $order->customer_phone,
+                'address' => $order->delivery_address ?? null,
+                'email' => null,
+                'edrpou_ipn' => null,
+                'is_auto_created' => true,
+            ]);
+        } else {
+            // Оновлюємо існуючого контрагента адресою доставки (якщо є)
+            if ($order->delivery_address && $counterparty->address !== $order->delivery_address) {
+                $counterparty->update([
+                    'address' => $order->delivery_address,
+                ]);
+            }
+        }
+
+        // Зберігаємо зв'язок counterparty_id в замовленні (якщо така колонка буде)
+        if (\Schema::hasColumn('orders', 'counterparty_id')) {
+            $order->update(['counterparty_id' => $counterparty->id]);
         }
     }
 }

@@ -58,12 +58,23 @@ class InvoiceResource extends Resource
                                 if ($orderId) {
                                     $order = \App\Models\Order::find($orderId);
                                     if ($order) {
-                                        // Auto-fill company and VAT from Order if they're set
+                                        // Auto-fill company and VAT from Order
                                         if ($order->our_company_id) {
                                             $set('our_company_id', $order->our_company_id);
                                         }
                                         if ($order->with_vat !== null) {
                                             $set('with_vat', $order->with_vat);
+                                        }
+
+                                        // Auto-fill counterparty from Order
+                                        if ($order->counterparty_id) {
+                                            $set('counterparty_id', $order->counterparty_id);
+                                        } elseif ($order->customer_phone) {
+                                            // Find by phone if not linked
+                                            $counterparty = Counterparty::where('phone', $order->customer_phone)->first();
+                                            if ($counterparty) {
+                                                $set('counterparty_id', $counterparty->id);
+                                            }
                                         }
                                     }
                                 }
@@ -91,6 +102,12 @@ class InvoiceResource extends Resource
                             ->options(fn () => Counterparty::orderBy('name')->pluck('name', 'id'))
                             ->required()
                             ->searchable()
+                            ->disabled(fn (Get $get): bool => !empty($get('order_id')))
+                            ->helperText(fn (Get $get): string =>
+                                !empty($get('order_id'))
+                                    ? 'Автоматично заповнено з замовлення'
+                                    : 'Виберіть контрагента-покупця'
+                            )
                             ->createOptionForm([
                                 Forms\Components\TextInput::make('name')
                                     ->label('Назва/ПІБ')

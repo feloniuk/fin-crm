@@ -38,10 +38,20 @@ class CreateInvoice extends CreateRecord
             return;
         }
 
-        // Find or create counterparty from order data
-        $counterparty = null;
-        if ($this->order->customer_phone) {
+        // Use counterparty from order, or find by phone, or create new
+        $counterparty = $this->order->counterparty;
+
+        if (!$counterparty && $this->order->customer_phone) {
             $counterparty = Counterparty::where('phone', $this->order->customer_phone)->first();
+        }
+
+        if (!$counterparty) {
+            $counterparty = Counterparty::create([
+                'name' => $this->order->customer_name,
+                'phone' => $this->order->customer_phone,
+                'address' => $this->order->delivery_address,
+                'is_auto_created' => true,
+            ]);
         }
 
         // Get items from order - use order_items if available, fallback to raw_data

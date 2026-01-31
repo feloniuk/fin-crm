@@ -18,6 +18,7 @@ class Order extends Model
     protected $fillable = [
         'shop_id',
         'external_id',
+        'counterparty_id',
         'customer_name',
         'customer_phone',
         'customer_comment',
@@ -86,6 +87,11 @@ class Order extends Model
     public function ourCompany(): BelongsTo
     {
         return $this->belongsTo(OurCompany::class);
+    }
+
+    public function counterparty(): BelongsTo
+    {
+        return $this->belongsTo(Counterparty::class);
     }
 
     // Scopes
