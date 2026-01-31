@@ -43,7 +43,8 @@ class InvoiceResource extends Resource
                         Forms\Components\DatePicker::make('invoice_date')
                             ->label('Дата рахунку')
                             ->required()
-                            ->default(now()),
+                            ->default(fn () => now())
+                            ->visibleOn('create'),
 
                         Forms\Components\Select::make('order_id')
                             ->label('Замовлення')
