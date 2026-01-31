@@ -13,6 +13,15 @@ class ViewOrder extends ViewRecord
 {
     protected static string $resource = OrderResource::class;
 
+    public function mutateFormDataBeforeFill(array $data): array
+    {
+        // Завантажуємо items з relationship
+        $record = $this->record;
+        $data['items'] = $record->items()->get()->toArray();
+
+        return $data;
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -23,7 +32,7 @@ class ViewOrder extends ViewRecord
                 ->form([
                     Forms\Components\Repeater::make('items')
                         ->label('Товари замовлення')
-                        ->relationship()
+                        ->relationship('items')
                         ->schema([
                             Forms\Components\Select::make('product_id')
                                 ->label('Товар')
@@ -145,13 +154,43 @@ class ViewOrder extends ViewRecord
                         ])
                         ->columns(3)
                         ->collapsible()
+                        ->addable(true)
+                        ->deletable(true)
                         ->columnSpanFull(),
                 ])
                 ->modalSubmitActionLabel('Зберегти')
                 ->modalCancelActionLabel('Скасувати')
                 ->modalHeading('Редагування товарів замовлення')
                 ->action(function (Order $record, array $data): void {
-                    $record->fill($data)->save();
+                    // Оновлюємо items через relationship
+                    if (isset($data['items'])) {
+                        $itemsData = $data['items'];
+
+                        // Видаляємо існуючі items які не в новому наборі
+                        $newItemIds = collect($itemsData)
+                            ->filter(fn ($item) => isset($item['id']))
+                            ->pluck('id')
+                            ->toArray();
+
+                        $record->items()
+                            ->whereNotIn('id', $newItemIds)
+                            ->delete();
+
+                        // Оновлюємо або створюємо items
+                        foreach ($itemsData as $itemData) {
+                            if (isset($itemData['id'])) {
+                                // Оновлюємо існуючий item
+                                $record->items()->find($itemData['id'])?->update($itemData);
+                            } else {
+                                // Створюємо новий item
+                                $record->items()->create($itemData);
+                            }
+                        }
+
+                        // Перерахуємо totals
+                        $record->recalculateTotals();
+                    }
+
                     Notification::make()
                         ->title('Товари оновлені')
                         ->body('Товари замовлення успішно оновлені')
