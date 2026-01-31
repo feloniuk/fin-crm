@@ -109,11 +109,11 @@ class InvoiceResource extends Resource
                         Forms\Components\Hidden::make('counterparty_id')
                             ->required(fn (Get $get): bool => !empty($get('order_id')) || !empty($get('counterparty_id_manual'))),
 
-                        // Display field when order is selected
+                        // Display field - show name/EDRPOU on view, or when order is selected on create
                         Forms\Components\TextInput::make('counterparty_name')
                             ->label('Контрагент-покупець')
                             ->disabled()
-                            ->visible(fn (Get $get): bool => !empty($get('order_id')))
+                            ->visible(fn (Get $get): bool => !empty($get('order_id')) || !empty($get('counterparty_id')))
                             ->helperText('Автоматично заповнено з замовлення')
                             ->columnSpanFull(),
 
@@ -158,13 +158,22 @@ class InvoiceResource extends Resource
                                 if (!$counterparty) {
                                     return 'Контрагент не вибраний';
                                 }
-                                $info = $counterparty->name;
+                                $info = $counterparty->name . "\n";
                                 if ($counterparty->edrpou_ipn) {
-                                    $info .= ' (ЄДРПОУ: ' . $counterparty->edrpou_ipn . ')';
+                                    $info .= 'ЄДРПОУ/ІПН: ' . $counterparty->edrpou_ipn . "\n";
+                                }
+                                if ($counterparty->address) {
+                                    $info .= 'Адреса: ' . $counterparty->address . "\n";
+                                }
+                                if ($counterparty->phone) {
+                                    $info .= 'Телефон: ' . $counterparty->phone . "\n";
+                                }
+                                if ($counterparty->email) {
+                                    $info .= 'Email: ' . $counterparty->email;
                                 }
                                 return $info;
                             })
-                            ->visibleOn('edit'),
+                            ->visibleOn(['edit', 'view']),
                     ]),
 
                 Forms\Components\Section::make('Товари')
@@ -181,7 +190,7 @@ class InvoiceResource extends Resource
                             ->live()
                             ->visibleOn('create'),
 
-                        // EDIT mode - relationship repeater
+                        // EDIT/VIEW mode - relationship repeater
                         Forms\Components\Repeater::make('items')
                             ->label('Позиції рахунку')
                             ->relationship('items')
@@ -191,7 +200,7 @@ class InvoiceResource extends Resource
                             ->collapsible()
                             ->columnSpanFull()
                             ->live()
-                            ->visibleOn('edit'),
+                            ->visibleOn(['edit', 'view']),
                     ]),
 
                 Forms\Components\Section::make('Знижка на рахунок')

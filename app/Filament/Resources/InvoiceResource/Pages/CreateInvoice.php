@@ -20,17 +20,15 @@ class CreateInvoice extends CreateRecord
 
     public function mount(): void
     {
-        // Check if order_id is passed in URL BEFORE parent mount
+        parent::mount();
+
+        // Check if order_id is passed in URL
         $orderId = request()->query('order_id');
         if ($orderId) {
             $this->order = Order::find($orderId);
-        }
-
-        parent::mount();
-
-        // Fill form AFTER parent mount when form is ready
-        if ($this->order) {
-            $this->fillFormFromOrder();
+            if ($this->order) {
+                $this->fillFormFromOrder();
+            }
         }
     }
 
@@ -79,12 +77,12 @@ class CreateInvoice extends CreateRecord
             $items = collect($this->order->getItemsFromRawData())->map(function ($item) {
                 return [
                     'name' => $item['name'],
-                    'quantity' => $item['quantity'],
+                    'quantity' => (float) $item['quantity'],
                     'unit' => 'шт.',
-                    'unit_price' => $item['unit_price'],
-                    'discount_type' => null,
+                    'unit_price' => (float) $item['unit_price'],
+                    'discount_type' => '',
                     'discount_value' => 0,
-                    'total' => $item['quantity'] * $item['unit_price'],
+                    'total' => (float) ($item['quantity'] * $item['unit_price']),
                 ];
             })->toArray();
             \Log::info('Using fallback raw_data items', [
@@ -93,24 +91,18 @@ class CreateInvoice extends CreateRecord
             ]);
         }
 
-        $formData = [
+        $this->form->fill([
             'invoice_date' => now()->toDateString(),
             'order_id' => $this->order->id,
             'our_company_id' => $this->order->our_company_id,
-            'with_vat' => $this->order->with_vat ?? false,
+            'with_vat' => (bool) ($this->order->with_vat ?? false),
             'counterparty_id' => $counterparty?->id,
             'counterparty_name' => $counterparty?->name,
             'items' => $items,
-            'is_paid' => $this->order->payed ?? false,
-        ];
-
-        \Log::info('Filling form with data', [
-            'items_count' => count($items),
-            'items_sample' => $items[0] ?? null,
+            'is_paid' => (bool) ($this->order->payed ?? false),
         ]);
-
-        $this->form->fill($formData);
     }
+
 
     public function mutateFormDataBeforeCreate(array $data): array
     {
