@@ -29,19 +29,21 @@ class ViewOrder extends ViewRecord
                 ->label('Редагувати товари')
                 ->icon('heroicon-o-pencil-square')
                 ->visible(fn (Order $record): bool => $record->status->canCreateInvoice())
+                ->fillForm(function (Order $record): array {
+                    // Явно заповнюємо items з БД
+                    return [
+                        'items' => $record->items()->get()->toArray(),
+                    ];
+                })
                 ->form([
                     Forms\Components\Repeater::make('items')
                         ->label('Товари замовлення')
-                        ->relationship('items')
                         ->schema([
                             Forms\Components\Select::make('product_id')
                                 ->label('Товар')
-                                ->relationship('product', 'name')
-                                ->createOptionForm([
-                                    Forms\Components\TextInput::make('name')
-                                        ->label('Назва')
-                                        ->required(),
-                                ])
+                                ->options(\App\Models\Product::pluck('name', 'id'))
+                                ->searchable()
+                                ->preload()
                                 ->columnSpanFull(),
 
                             Forms\Components\TextInput::make('name')
