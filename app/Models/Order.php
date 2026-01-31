@@ -21,8 +21,17 @@ class Order extends Model
         'customer_name',
         'customer_phone',
         'customer_comment',
+        'delivery_name',
+        'delivery_address',
+        'delivery_city',
+        'delivery_type',
+        'payment_type',
+        'payed',
+        'manager_comment',
+        'currency',
         'total_amount',
         'status',
+        'api_status',
         'raw_data',
         'synced_at',
         'our_company_id',
@@ -39,6 +48,7 @@ class Order extends Model
             'raw_data' => 'array',
             'total_amount' => 'decimal:2',
             'with_vat' => 'boolean',
+            'payed' => 'boolean',
             'subtotal' => 'decimal:2',
             'discount_total' => 'decimal:2',
             'synced_at' => 'datetime',
@@ -138,8 +148,9 @@ class Order extends Model
             return [
                 'name' => data_get($item, 'name', data_get($item, 'title', 'Товар')),
                 'quantity' => (float) data_get($item, 'quantity', data_get($item, 'amount', 1)),
-                'unit_price' => (float) data_get($item, 'price', 0),
-                'external_id' => data_get($item, 'product_id', data_get($item, 'id')),
+                'unit_price' => (float) data_get($item, 'price', data_get($item, 'unit_price', 0)),
+                // For Horoshop: article is like SKU/external_id, try article first
+                'external_id' => data_get($item, 'article', data_get($item, 'product_id', data_get($item, 'id', ''))),
             ];
         })->toArray();
     }

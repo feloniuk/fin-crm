@@ -74,6 +74,56 @@ class OrderResource extends Resource
                             ->columnSpanFull(),
                     ]),
 
+                Forms\Components\Section::make('Дані доставки')
+                    ->schema([
+                        Forms\Components\TextInput::make('delivery_name')
+                            ->label('ПІБ одержувача')
+                            ->disabled(),
+
+                        Forms\Components\TextInput::make('delivery_phone')
+                            ->label('Телефон одержувача')
+                            ->disabled(),
+
+                        Forms\Components\TextInput::make('delivery_city')
+                            ->label('Місто доставки')
+                            ->disabled(),
+
+                        Forms\Components\TextInput::make('delivery_type')
+                            ->label('Тип доставки')
+                            ->disabled(),
+
+                        Forms\Components\Textarea::make('delivery_address')
+                            ->label('Адреса доставки')
+                            ->disabled()
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2),
+
+                Forms\Components\Section::make('Оплата та статус')
+                    ->schema([
+                        Forms\Components\TextInput::make('payment_type')
+                            ->label('Тип оплати')
+                            ->disabled(),
+
+                        Forms\Components\Toggle::make('payed')
+                            ->label('Оплачено')
+                            ->disabled(),
+
+                        Forms\Components\TextInput::make('currency')
+                            ->label('Валюта')
+                            ->disabled(),
+
+                        Forms\Components\TextInput::make('api_status')
+                            ->label('Статус в API')
+                            ->disabled(),
+
+                        Forms\Components\Textarea::make('manager_comment')
+                            ->label('Коментар менеджера')
+                            ->disabled()
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2),
+
                 Forms\Components\Section::make('Дані API')
                     ->schema([
                         Forms\Components\Textarea::make('raw_data_display')
@@ -186,6 +236,16 @@ class OrderResource extends Resource
                 Tables\Columns\TextColumn::make('customer_phone')
                     ->label('Телефон')
                     ->searchable(),
+
+                Tables\Columns\TextColumn::make('delivery_city')
+                    ->label('Місто')
+                    ->searchable()
+                    ->toggleable(),
+
+                Tables\Columns\TextColumn::make('delivery_type')
+                    ->label('Доставка')
+                    ->searchable()
+                    ->toggleable(),
 
                 Tables\Columns\TextColumn::make('total_amount')
                     ->label('Сума')
