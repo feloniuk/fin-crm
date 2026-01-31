@@ -20,9 +20,16 @@ class PromUaApiClient implements ShopApiClientInterface
     public function testConnection(): bool
     {
         try {
-            $response = Http::withHeaders([
+            $builder = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $this->credentials->apiToken,
-            ])->timeout(10)->get('https://my.prom.ua/api/v1/me');
+            ])->timeout(10);
+
+            // Skip SSL verification in development
+            if (!app()->isProduction()) {
+                $builder = $builder->withoutVerifying();
+            }
+
+            $response = $builder->get('https://my.prom.ua/api/v1/me');
 
             if ($response->successful()) {
                 return true;
@@ -49,9 +56,16 @@ class PromUaApiClient implements ShopApiClientInterface
             $hasMore = true;
 
             while ($hasMore) {
-                $response = Http::withHeaders([
+                $builder = Http::withHeaders([
                     'Authorization' => 'Bearer ' . $this->credentials->apiToken,
-                ])->timeout(30)->get('https://my.prom.ua/api/v1/orders/list', [
+                ])->timeout(30);
+
+                // Skip SSL verification in development
+                if (!app()->isProduction()) {
+                    $builder = $builder->withoutVerifying();
+                }
+
+                $response = $builder->get('https://my.prom.ua/api/v1/orders/list', [
                     'updated_from' => $since->toIso8601String(),
                     'limit' => 100,
                     'page' => $page,
@@ -83,9 +97,16 @@ class PromUaApiClient implements ShopApiClientInterface
     public function getOrderByExternalId(string $externalId): ?OrderDTO
     {
         try {
-            $response = Http::withHeaders([
+            $builder = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $this->credentials->apiToken,
-            ])->timeout(10)->get("https://my.prom.ua/api/v1/orders/{$externalId}");
+            ])->timeout(10);
+
+            // Skip SSL verification in development
+            if (!app()->isProduction()) {
+                $builder = $builder->withoutVerifying();
+            }
+
+            $response = $builder->get("https://my.prom.ua/api/v1/orders/{$externalId}");
 
             if ($response->successful()) {
                 return OrderDTO::fromArray($response->json('data', []));

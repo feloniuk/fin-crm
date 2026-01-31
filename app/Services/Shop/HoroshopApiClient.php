@@ -45,8 +45,14 @@ class HoroshopApiClient implements ShopApiClientInterface
     public function authenticate(): bool
     {
         try {
-            $response = Http::timeout(15)
-                ->post($this->getApiUrl('auth/'), [
+            $builder = Http::timeout(15);
+
+            // Skip SSL verification in development
+            if (!app()->isProduction()) {
+                $builder = $builder->withoutVerifying();
+            }
+
+            $response = $builder->post($this->getApiUrl('auth/'), [
                     'login' => $this->credentials->login,
                     'password' => $this->credentials->password,
                 ]);
@@ -121,8 +127,14 @@ class HoroshopApiClient implements ShopApiClientInterface
             $hasMore = true;
 
             while ($hasMore) {
-                $response = Http::timeout(30)
-                    ->post($this->getApiUrl('orders/get/'), [
+                $builder = Http::timeout(30);
+
+                // Skip SSL verification in development
+                if (!app()->isProduction()) {
+                    $builder = $builder->withoutVerifying();
+                }
+
+                $response = $builder->post($this->getApiUrl('orders/get/'), [
                         'token' => $this->token,
                         'limit' => $limit,
                         'offset' => $offset,
@@ -205,9 +217,15 @@ class HoroshopApiClient implements ShopApiClientInterface
         }
 
         try {
+            $builder = Http::timeout(15);
+
+            // Skip SSL verification in development
+            if (!app()->isProduction()) {
+                $builder = $builder->withoutVerifying();
+            }
+
             // Horoshop API - получаем заказ по ID через общий endpoint с фильтром
-            $response = Http::timeout(15)
-                ->post($this->getApiUrl('orders/get/'), [
+            $response = $builder->post($this->getApiUrl('orders/get/'), [
                     'token' => $this->token,
                     'order_id' => $externalId,
                     'additionalData' => true,
