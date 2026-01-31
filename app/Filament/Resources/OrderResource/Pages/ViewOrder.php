@@ -56,6 +56,9 @@ class ViewOrder extends ViewRecord
                                 ->numeric()
                                 ->step(0.001)
                                 ->required()
+                                ->formatStateUsing(fn ($state) =>
+                                    is_numeric($state) ? rtrim(rtrim(number_format((float)$state, 3, '.', ''), '0'), '.') : $state
+                                )
                                 ->live()
                                 ->afterStateUpdated(function (Forms\Set $set) {
                                     $set('subtotal', null);
@@ -69,6 +72,9 @@ class ViewOrder extends ViewRecord
                                 ->numeric()
                                 ->step(0.01)
                                 ->required()
+                                ->formatStateUsing(fn ($state) =>
+                                    is_numeric($state) ? rtrim(rtrim(number_format((float)$state, 2, '.', ''), '0'), '.') : $state
+                                )
                                 ->live()
                                 ->afterStateUpdated(function (Forms\Set $set) {
                                     $set('subtotal', null);
@@ -96,6 +102,9 @@ class ViewOrder extends ViewRecord
                                 ->numeric()
                                 ->step(0.01)
                                 ->visible(fn (Forms\Get $get): bool => !empty($get('discount_type')))
+                                ->formatStateUsing(fn ($state) =>
+                                    is_numeric($state) ? rtrim(rtrim(number_format((float)$state, 2, '.', ''), '0'), '.') : $state
+                                )
                                 ->live()
                                 ->afterStateUpdated(function (Forms\Set $set) {
                                     $set('discount_amount', null);
