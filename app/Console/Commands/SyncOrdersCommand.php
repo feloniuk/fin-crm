@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 
 class SyncOrdersCommand extends Command
 {
-    protected $signature = 'orders:sync {--shop= : Синхронізувати конкретний магазин}';
+    protected $signature = 'orders:sync {--shop= : Синхронізувати конкретний магазин} {--force : Переінціалізувати синхронізацію (загрузити всі заказы за 30 днів)}';
 
     protected $description = 'Синхронізувати замовлення з магазинів';
 
@@ -29,6 +29,18 @@ class SyncOrdersCommand extends Command
             $this->info("📦 Синхронізуємо магазин: {$shop->name}");
         } else {
             $this->info('📦 Синхронізуємо всі активні магазини');
+        }
+
+        // Якщо використовується флаг --force, скидаємо last_synced_at
+        if ($this->option('force')) {
+            $this->info('⚠️  Режим --force: переінціалізація синхронізації');
+            if ($shop) {
+                $shop->update(['last_synced_at' => null]);
+                $this->info("✓ Скидаємо last_synced_at для магазину: {$shop->name}");
+            } else {
+                Shop::where('is_active', true)->update(['last_synced_at' => null]);
+                $this->info('✓ Скидаємо last_synced_at для всіх активних магазинів');
+            }
         }
 
         try {
