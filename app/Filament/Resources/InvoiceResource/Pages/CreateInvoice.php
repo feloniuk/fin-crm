@@ -84,6 +84,7 @@ class CreateInvoice extends CreateRecord
         }
 
         $this->form->fill([
+            'invoice_date' => now(),
             'order_id' => $this->order->id,
             'our_company_id' => $this->order->our_company_id,
             'with_vat' => $this->order->with_vat ?? false,
