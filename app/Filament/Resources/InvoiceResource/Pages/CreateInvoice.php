@@ -95,7 +95,7 @@ class CreateInvoice extends CreateRecord
 
     public function mutateFormDataBeforeCreate(array $data): array
     {
-        // Extract items from form data before creating
+        // Store form data for use in handleRecordCreation
         $this->data = $data;
         return [];
     }
@@ -103,21 +103,32 @@ class CreateInvoice extends CreateRecord
     protected function handleRecordCreation(array $data): Model
     {
         try {
-            $company = OurCompany::findOrFail($this->data['our_company_id']);
-            $counterparty = Counterparty::findOrFail($this->data['counterparty_id']);
-            $order = isset($this->data['order_id']) ? Order::find($this->data['order_id']) : null;
+            // Use stored data or passed data
+            $formData = $this->data ?? $data;
+
+            // Validate required fields
+            if (empty($formData['our_company_id'])) {
+                throw new \Exception('Наша компанія не вибрана');
+            }
+            if (empty($formData['counterparty_id'])) {
+                throw new \Exception('Контрагент не вибран');
+            }
+
+            $company = OurCompany::findOrFail($formData['our_company_id']);
+            $counterparty = Counterparty::findOrFail($formData['counterparty_id']);
+            $order = isset($formData['order_id']) ? Order::find($formData['order_id']) : null;
 
             $action = app(CreateInvoiceAction::class);
 
             $invoice = $action->execute(
                 company: $company,
                 counterparty: $counterparty,
-                items: $this->data['items'] ?? [],
-                withVat: (bool) ($this->data['with_vat'] ?? false),
+                items: $formData['items'] ?? [],
+                withVat: (bool) ($formData['with_vat'] ?? false),
                 order: $order,
-                comment: $this->data['comment'] ?? null,
-                discountType: DiscountType::tryFrom($this->data['discount_type'] ?? '') ?? DiscountType::NONE,
-                discountValue: (float) ($this->data['discount_value'] ?? 0),
+                comment: $formData['comment'] ?? null,
+                discountType: DiscountType::tryFrom($formData['discount_type'] ?? '') ?? DiscountType::NONE,
+                discountValue: (float) ($formData['discount_value'] ?? 0),
             );
 
             Notification::make()
