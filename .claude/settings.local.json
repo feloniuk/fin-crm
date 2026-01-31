@@ -28,7 +28,8 @@
       "Bash(composer show:*)",
       "WebFetch(domain:horoshop.notion.site)",
       "WebSearch",
-      "WebFetch(domain:horoshop.atlassian.net)"
+      "WebFetch(domain:horoshop.atlassian.net)",
+      "Bash(grep:*)"
     ]
   }
 }
