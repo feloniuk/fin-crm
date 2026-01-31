@@ -98,17 +98,31 @@ class InvoiceResource extends Resource
 
                 Forms\Components\Section::make('Контрагент-покупець')
                     ->schema([
-                        Forms\Components\Select::make('counterparty_id')
-                            ->label('Контрагент')
+                        // Hidden field to always send counterparty_id
+                        Forms\Components\Hidden::make('counterparty_id')
+                            ->required(fn (Get $get): bool => !empty($get('order_id')) || !empty($get('counterparty_id_manual'))),
+
+                        // Display field when order is selected
+                        Forms\Components\TextInput::make('counterparty_name')
+                            ->label('Контрагент-покупець')
+                            ->disabled()
+                            ->visible(fn (Get $get): bool => !empty($get('order_id')))
+                            ->helperText('Автоматично заповнено з замовлення')
+                            ->columnSpanFull(),
+
+                        // Select field when no order (for manual creation)
+                        Forms\Components\Select::make('counterparty_id_manual')
+                            ->label('Контрагент-покупець')
                             ->options(fn () => Counterparty::orderBy('name')->pluck('name', 'id'))
-                            ->required()
+                            ->required(fn (Get $get): bool => empty($get('order_id')))
                             ->searchable()
-                            ->disabled(fn (Get $get): bool => !empty($get('order_id')))
-                            ->helperText(fn (Get $get): string =>
-                                !empty($get('order_id'))
-                                    ? 'Автоматично заповнено з замовлення'
-                                    : 'Виберіть контрагента-покупця'
+                            ->visible(fn (Get $get): bool => empty($get('order_id')))
+                            ->helperText('Виберіть контрагента-покупця')
+                            ->live()
+                            ->afterStateUpdated(fn (Set $set, Get $get) =>
+                                $set('counterparty_id', $get('counterparty_id_manual'))
                             )
+                            ->columnSpanFull()
                             ->createOptionForm([
                                 Forms\Components\TextInput::make('name')
                                     ->label('Назва/ПІБ')

@@ -89,46 +89,73 @@ class CreateInvoice extends CreateRecord
             'our_company_id' => $this->order->our_company_id,
             'with_vat' => $this->order->with_vat ?? false,
             'counterparty_id' => $counterparty?->id,
+            'counterparty_name' => $counterparty?->name,
             'items' => $items,
         ]);
     }
 
     public function mutateFormDataBeforeCreate(array $data): array
     {
-        // Store form data for use in handleRecordCreation
+        // Store complete form data before processing
         $this->data = $data;
+
+        \Log::info('Invoice form data before create', [
+            'order_id' => $data['order_id'] ?? null,
+            'our_company_id' => $data['our_company_id'] ?? null,
+            'counterparty_id' => $data['counterparty_id'] ?? null,
+            'items_count' => count($data['items'] ?? []),
+        ]);
+
         return [];
     }
 
     protected function handleRecordCreation(array $data): Model
     {
         try {
-            // Use stored data or passed data
+            // Get all form data
             $formData = $this->data ?? $data;
 
+            \Log::info('Invoice creating with data', ['data_keys' => array_keys($formData)]);
+
+            // Extract values
+            $orderId = $formData['order_id'] ?? null;
+            $ourCompanyId = $formData['our_company_id'] ?? null;
+            $counterpartyId = $formData['counterparty_id'] ?? null;
+            $items = $formData['items'] ?? [];
+            $withVat = (bool) ($formData['with_vat'] ?? false);
+            $comment = $formData['comment'] ?? null;
+            $discountType = DiscountType::tryFrom($formData['discount_type'] ?? '') ?? DiscountType::NONE;
+            $discountValue = (float) ($formData['discount_value'] ?? 0);
+
+            \Log::info('Extracted values', [
+                'ourCompanyId' => $ourCompanyId,
+                'counterpartyId' => $counterpartyId,
+                'orderId' => $orderId,
+            ]);
+
             // Validate required fields
-            if (empty($formData['our_company_id'])) {
+            if (empty($ourCompanyId)) {
                 throw new \Exception('Наша компанія не вибрана');
             }
-            if (empty($formData['counterparty_id'])) {
-                throw new \Exception('Контрагент не вибран');
+            if (empty($counterpartyId)) {
+                throw new \Exception('Контрагент не вибран. counterparty_id=' . ($counterpartyId ?? 'null'));
             }
 
-            $company = OurCompany::findOrFail($formData['our_company_id']);
-            $counterparty = Counterparty::findOrFail($formData['counterparty_id']);
-            $order = isset($formData['order_id']) ? Order::find($formData['order_id']) : null;
+            $company = OurCompany::findOrFail($ourCompanyId);
+            $counterparty = Counterparty::findOrFail($counterpartyId);
+            $order = $orderId ? Order::find($orderId) : null;
 
             $action = app(CreateInvoiceAction::class);
 
             $invoice = $action->execute(
                 company: $company,
                 counterparty: $counterparty,
-                items: $formData['items'] ?? [],
-                withVat: (bool) ($formData['with_vat'] ?? false),
+                items: $items,
+                withVat: $withVat,
                 order: $order,
-                comment: $formData['comment'] ?? null,
-                discountType: DiscountType::tryFrom($formData['discount_type'] ?? '') ?? DiscountType::NONE,
-                discountValue: (float) ($formData['discount_value'] ?? 0),
+                comment: $comment,
+                discountType: $discountType,
+                discountValue: $discountValue,
             );
 
             Notification::make()
