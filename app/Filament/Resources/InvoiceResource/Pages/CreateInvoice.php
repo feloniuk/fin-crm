@@ -20,15 +20,17 @@ class CreateInvoice extends CreateRecord
 
     public function mount(): void
     {
-        parent::mount();
-
-        // Check if order_id is passed in URL
+        // Check if order_id is passed in URL BEFORE parent mount
         $orderId = request()->query('order_id');
         if ($orderId) {
             $this->order = Order::find($orderId);
-            if ($this->order) {
-                $this->fillFormFromOrder();
-            }
+        }
+
+        parent::mount();
+
+        // Fill form AFTER parent mount when form is ready
+        if ($this->order) {
+            $this->fillFormFromOrder();
         }
     }
 
@@ -60,14 +62,18 @@ class CreateInvoice extends CreateRecord
             $items = $this->order->items()->get()->map(function ($item) {
                 return [
                     'name' => $item->name,
-                    'quantity' => $item->quantity,
-                    'unit' => 'шт.',
-                    'unit_price' => $item->unit_price,
-                    'discount_type' => $item->discount_type,
-                    'discount_value' => $item->discount_value,
-                    'total' => $item->total,
+                    'quantity' => (float) $item->quantity,
+                    'unit' => $item->unit ?? 'шт.',
+                    'unit_price' => (float) $item->unit_price,
+                    'discount_type' => $item->discount_type ?? '',
+                    'discount_value' => (float) ($item->discount_value ?? 0),
+                    'total' => (float) $item->total,
                 ];
             })->toArray();
+            \Log::info('Order items found', [
+                'order_id' => $this->order->id,
+                'items_count' => count($items),
+            ]);
         } else {
             // Fallback to raw_data for legacy orders
             $items = collect($this->order->getItemsFromRawData())->map(function ($item) {
@@ -81,17 +87,29 @@ class CreateInvoice extends CreateRecord
                     'total' => $item['quantity'] * $item['unit_price'],
                 ];
             })->toArray();
+            \Log::info('Using fallback raw_data items', [
+                'order_id' => $this->order->id,
+                'items_count' => count($items),
+            ]);
         }
 
-        $this->form->fill([
-            'invoice_date' => now(),
+        $formData = [
+            'invoice_date' => now()->toDateString(),
             'order_id' => $this->order->id,
             'our_company_id' => $this->order->our_company_id,
             'with_vat' => $this->order->with_vat ?? false,
             'counterparty_id' => $counterparty?->id,
             'counterparty_name' => $counterparty?->name,
             'items' => $items,
+            'is_paid' => $this->order->payed ?? false,
+        ];
+
+        \Log::info('Filling form with data', [
+            'items_count' => count($items),
+            'items_sample' => $items[0] ?? null,
         ]);
+
+        $this->form->fill($formData);
     }
 
     public function mutateFormDataBeforeCreate(array $data): array
@@ -126,11 +144,14 @@ class CreateInvoice extends CreateRecord
             $comment = $formData['comment'] ?? null;
             $discountType = DiscountType::tryFrom($formData['discount_type'] ?? '') ?? DiscountType::NONE;
             $discountValue = (float) ($formData['discount_value'] ?? 0);
+            $isPaid = (bool) ($formData['is_paid'] ?? false);
 
             \Log::info('Extracted values', [
                 'ourCompanyId' => $ourCompanyId,
                 'counterpartyId' => $counterpartyId,
                 'orderId' => $orderId,
+                'items_count' => count($items),
+                'items_sample' => array_slice($items, 0, 1),
             ]);
 
             // Validate required fields
@@ -156,6 +177,7 @@ class CreateInvoice extends CreateRecord
                 comment: $comment,
                 discountType: $discountType,
                 discountValue: $discountValue,
+                isPaid: $isPaid,
             );
 
             Notification::make()

@@ -18,17 +18,19 @@ class ExcelInvoiceGenerator implements DocumentGeneratorInterface
         $sheet = $spreadsheet->getActiveSheet();
 
         // Set column widths
-        $sheet->getColumnDimension('A')->setWidth(20);
-        $sheet->getColumnDimension('B')->setWidth(15);
-        $sheet->getColumnDimension('C')->setWidth(10);
-        $sheet->getColumnDimension('D')->setWidth(15);
-        $sheet->getColumnDimension('E')->setWidth(15);
+        $sheet->getColumnDimension('A')->setWidth(25);
+        $sheet->getColumnDimension('B')->setWidth(12);
+        $sheet->getColumnDimension('C')->setWidth(8);
+        $sheet->getColumnDimension('D')->setWidth(12);
+        $sheet->getColumnDimension('E')->setWidth(12);
+        $sheet->getColumnDimension('F')->setWidth(12);
+        $sheet->getColumnDimension('G')->setWidth(12);
 
         $row = 1;
 
         // Header
         $sheet->setCellValue('A' . $row, 'РАХУНОК');
-        $sheet->mergeCells('A' . $row . ':E' . $row);
+        $sheet->mergeCells('A' . $row . ':G' . $row);
         $sheet->getStyle('A' . $row)->getFont()->setBold(true)->setSize(14);
         $sheet->getStyle('A' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $row += 2;
@@ -44,20 +46,89 @@ class ExcelInvoiceGenerator implements DocumentGeneratorInterface
 
         // Company info
         $sheet->setCellValue('A' . $row, 'Продавець:');
-        $sheet->setCellValue('A' . ($row + 1), $invoice->ourCompany->name);
-        $sheet->setCellValue('A' . ($row + 2), 'ЄДРПОУ: ' . $invoice->ourCompany->edrpou_ipn);
-        $row += 3;
+        $sheet->getStyle('A' . $row)->getFont()->setBold(true);
+        $row++;
 
-        $sheet->setCellValue('A' . $row, 'Покупець:');
-        $sheet->setCellValue('A' . ($row + 1), $invoice->counterparty->name);
-        if ($invoice->counterparty->edrpou_ipn) {
-            $sheet->setCellValue('A' . ($row + 2), 'ЄДРПОУ: ' . $invoice->counterparty->edrpou_ipn);
-            $row += 3;
-        } else {
-            $row += 2;
+        $sheet->setCellValue('A' . $row, $invoice->ourCompany->name);
+        $row++;
+        $sheet->setCellValue('A' . $row, 'ЄДРПОУ/ІПН: ' . $invoice->ourCompany->edrpou_ipn);
+        $row++;
+
+        if ($invoice->ourCompany->address) {
+            $sheet->setCellValue('A' . $row, 'Адреса: ' . $invoice->ourCompany->address);
+            $row++;
+        }
+
+        if ($invoice->ourCompany->phone) {
+            $sheet->setCellValue('A' . $row, 'Телефон: ' . $invoice->ourCompany->phone);
+            $row++;
+        }
+
+        if ($invoice->ourCompany->email) {
+            $sheet->setCellValue('A' . $row, 'Email: ' . $invoice->ourCompany->email);
+            $row++;
         }
 
         $row++;
+
+        // Counterparty info
+        $sheet->setCellValue('A' . $row, 'Покупець:');
+        $sheet->getStyle('A' . $row)->getFont()->setBold(true);
+        $row++;
+
+        $sheet->setCellValue('A' . $row, $invoice->counterparty->name);
+        $row++;
+
+        if ($invoice->counterparty->edrpou_ipn) {
+            $sheet->setCellValue('A' . $row, 'ЄДРПОУ/ІПН: ' . $invoice->counterparty->edrpou_ipn);
+            $row++;
+        }
+
+        if ($invoice->counterparty->address) {
+            $sheet->setCellValue('A' . $row, 'Адреса: ' . $invoice->counterparty->address);
+            $row++;
+        }
+
+        if ($invoice->counterparty->phone) {
+            $sheet->setCellValue('A' . $row, 'Телефон: ' . $invoice->counterparty->phone);
+            $row++;
+        }
+
+        if ($invoice->counterparty->email) {
+            $sheet->setCellValue('A' . $row, 'Email: ' . $invoice->counterparty->email);
+            $row++;
+        }
+
+        $row++;
+
+        // Add delivery section if available
+        if ($invoice->order && ($invoice->order->delivery_name || $invoice->order->delivery_address)) {
+            $sheet->setCellValue('A' . $row, 'Доставка:');
+            $sheet->getStyle('A' . $row)->getFont()->setBold(true);
+            $row++;
+
+            if ($invoice->order->delivery_name) {
+                $sheet->setCellValue('A' . $row, 'Одержувач: ' . $invoice->order->delivery_name);
+                $row++;
+            }
+
+            if ($invoice->order->delivery_city) {
+                $sheet->setCellValue('A' . $row, 'Місто: ' . $invoice->order->delivery_city);
+                $row++;
+            }
+
+            if ($invoice->order->delivery_address) {
+                $sheet->setCellValue('A' . $row, 'Адреса: ' . $invoice->order->delivery_address);
+                $row++;
+            }
+
+            if ($invoice->order->delivery_type) {
+                $sheet->setCellValue('A' . $row, 'Тип доставки: ' . $invoice->order->delivery_type);
+                $row++;
+            }
+
+            $row++;
+        }
 
         // Items header
         $headerRow = $row;
@@ -65,9 +136,11 @@ class ExcelInvoiceGenerator implements DocumentGeneratorInterface
         $sheet->setCellValue('B' . $row, 'Кількість');
         $sheet->setCellValue('C' . $row, 'Од.изм.');
         $sheet->setCellValue('D' . $row, 'Ціна');
-        $sheet->setCellValue('E' . $row, 'Сума');
+        $sheet->setCellValue('E' . $row, 'Підсумок');
+        $sheet->setCellValue('F' . $row, 'Знижка');
+        $sheet->setCellValue('G' . $row, 'Сума');
 
-        $this->applyBorderStyle($sheet, 'A' . $row . ':E' . $row);
+        $this->applyBorderStyle($sheet, 'A' . $row . ':G' . $row);
         $sheet->getStyle('A' . $row)->getFont()->setBold(true);
         $row++;
 
@@ -77,9 +150,22 @@ class ExcelInvoiceGenerator implements DocumentGeneratorInterface
             $sheet->setCellValue('B' . $row, $item->quantity);
             $sheet->setCellValue('C' . $row, $item->unit);
             $sheet->setCellValue('D' . $row, $item->unit_price);
-            $sheet->setCellValue('E' . $row, $item->total);
+            $sheet->setCellValue('E' . $row, $item->subtotal);
 
-            $this->applyBorderStyle($sheet, 'A' . $row . ':E' . $row);
+            // Format discount display
+            $discountDisplay = '';
+            if ($item->discount_amount > 0) {
+                $discountDisplay = number_format($item->discount_amount, 2) . ' грн';
+                if ($item->discount_type === 'percent') {
+                    $discountDisplay .= ' (' . number_format($item->discount_value, 2) . '%)';
+                }
+            } else {
+                $discountDisplay = '—';
+            }
+            $sheet->setCellValue('F' . $row, $discountDisplay);
+            $sheet->setCellValue('G' . $row, $item->total);
+
+            $this->applyBorderStyle($sheet, 'A' . $row . ':G' . $row);
             $row++;
         }
 
@@ -87,35 +173,35 @@ class ExcelInvoiceGenerator implements DocumentGeneratorInterface
         $totalsStartRow = $row;
         $row++;
 
-        $sheet->setCellValue('D' . $row, 'Сума без ПДВ:');
-        $sheet->setCellValue('E' . $row, $invoice->subtotal);
-        $this->applyBorderStyle($sheet, 'D' . $row . ':E' . $row);
+        $sheet->setCellValue('F' . $row, 'Сума без ПДВ:');
+        $sheet->setCellValue('G' . $row, $invoice->subtotal);
+        $this->applyBorderStyle($sheet, 'F' . $row . ':G' . $row);
         $row++;
 
         if ($invoice->with_vat) {
-            $sheet->setCellValue('D' . $row, 'ПДВ (20%):');
-            $sheet->setCellValue('E' . $row, $invoice->vat_amount);
-            $this->applyBorderStyle($sheet, 'D' . $row . ':E' . $row);
+            $sheet->setCellValue('F' . $row, 'ПДВ (20%):');
+            $sheet->setCellValue('G' . $row, $invoice->vat_amount);
+            $this->applyBorderStyle($sheet, 'F' . $row . ':G' . $row);
             $row++;
         }
 
-        $sheet->setCellValue('D' . $row, 'РАЗОМ:');
-        $sheet->setCellValue('E' . $row, $invoice->total);
-        $sheet->getStyle('D' . $row)->getFont()->setBold(true);
-        $sheet->getStyle('E' . $row)->getFont()->setBold(true);
-        $this->applyBorderStyle($sheet, 'D' . $row . ':E' . $row);
+        $sheet->setCellValue('F' . $row, 'РАЗОМ:');
+        $sheet->setCellValue('G' . $row, $invoice->total);
+        $sheet->getStyle('F' . $row)->getFont()->setBold(true);
+        $sheet->getStyle('G' . $row)->getFont()->setBold(true);
+        $this->applyBorderStyle($sheet, 'F' . $row . ':G' . $row);
         $row += 2;
 
         // Sum in words
         $sumInWords = NumberToWordsUkrainian::convert((int) $invoice->total);
         $sheet->setCellValue('A' . $row, 'Сумою: ' . $sumInWords . ' гривень');
-        $sheet->mergeCells('A' . $row . ':E' . $row);
+        $sheet->mergeCells('A' . $row . ':G' . $row);
         $row += 2;
 
         // Comment
         if ($invoice->comment) {
             $sheet->setCellValue('A' . $row, 'Примітка: ' . $invoice->comment);
-            $sheet->mergeCells('A' . $row . ':E' . $row);
+            $sheet->mergeCells('A' . $row . ':G' . $row);
             $row++;
         }
 

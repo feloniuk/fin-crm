@@ -173,14 +173,36 @@
             </div>
         </div>
 
+        @if($invoice->order && ($invoice->order->delivery_name || $invoice->order->delivery_address))
+            <div class="section">
+                <div class="section-title">Доставка:</div>
+                <div class="section-content">
+                    @if($invoice->order->delivery_name)
+                        Одержувач: {{ $invoice->order->delivery_name }}<br>
+                    @endif
+                    @if($invoice->order->delivery_city)
+                        Місто: {{ $invoice->order->delivery_city }}<br>
+                    @endif
+                    @if($invoice->order->delivery_address)
+                        Адреса: {{ $invoice->order->delivery_address }}<br>
+                    @endif
+                    @if($invoice->order->delivery_type)
+                        Тип доставки: {{ $invoice->order->delivery_type }}
+                    @endif
+                </div>
+            </div>
+        @endif
+
         <table>
             <thead>
                 <tr>
-                    <th style="width: 40%;">Назва товару/послуги</th>
-                    <th style="width: 15%;">Кількість</th>
-                    <th style="width: 10%;">Од.изм.</th>
-                    <th style="width: 15%;" class="text-right">Ціна</th>
-                    <th style="width: 20%;" class="text-right">Сума</th>
+                    <th style="width: 30%;">Назва товару/послуги</th>
+                    <th style="width: 12%;">Кількість</th>
+                    <th style="width: 8%;">Од.изм.</th>
+                    <th style="width: 13%;" class="text-right">Ціна</th>
+                    <th style="width: 12%;" class="text-right">Підсумок</th>
+                    <th style="width: 12%;" class="text-right">Знижка</th>
+                    <th style="width: 13%;" class="text-right">Сума</th>
                 </tr>
             </thead>
             <tbody>
@@ -190,6 +212,17 @@
                         <td class="text-right">{{ number_format($item->quantity, 3, '.', '') }}</td>
                         <td class="text-center">{{ $item->unit }}</td>
                         <td class="text-right">{{ number_format($item->unit_price, 2, ',', ' ') }} грн</td>
+                        <td class="text-right">{{ number_format($item->subtotal, 2, ',', ' ') }} грн</td>
+                        <td class="text-right">
+                            @if($item->discount_amount > 0)
+                                {{ number_format($item->discount_amount, 2, ',', ' ') }} грн
+                                @if($item->discount_type === 'percent')
+                                    <br><span style="font-size: 9px;">({{ number_format($item->discount_value, 2) }}%)</span>
+                                @endif
+                            @else
+                                —
+                            @endif
+                        </td>
                         <td class="text-right">{{ number_format($item->total, 2, ',', ' ') }} грн</td>
                     </tr>
                 @endforeach

@@ -31,6 +31,7 @@ class CreateInvoiceAction
         ?string $comment = null,
         DiscountType $discountType = DiscountType::NONE,
         float $discountValue = 0,
+        bool $isPaid = false,
     ): Invoice {
         return DB::transaction(function () use (
             $company,
@@ -41,6 +42,7 @@ class CreateInvoiceAction
             $comment,
             $discountType,
             $discountValue,
+            $isPaid,
         ) {
             // Calculate totals
             $calculations = $this->calculator->calculateInvoice(
@@ -82,10 +84,16 @@ class CreateInvoiceAction
                 'subtotal' => $calculations['subtotal'],
                 'vat_amount' => $calculations['vat_amount'],
                 'total' => $calculations['total'],
-                'is_paid' => false,
+                'is_paid' => $isPaid,
             ]);
 
             // Create invoice items
+            \Log::info('Creating invoice items', [
+                'invoice_id' => $invoice->id,
+                'items_count' => count($items),
+                'items_data' => $items,
+            ]);
+
             foreach ($items as $itemData) {
                 // InvoiceItem автоматично розрахує subtotal, discount_amount, total
                 InvoiceItem::create([
@@ -99,8 +107,13 @@ class CreateInvoiceAction
                 ]);
             }
 
-            // Refresh invoice with items
-            $invoice->load('items');
+            \Log::info('Invoice items created successfully', [
+                'invoice_id' => $invoice->id,
+                'created_items' => $invoice->items()->count(),
+            ]);
+
+            // Refresh invoice with items and order
+            $invoice->load('items', 'order');
 
             // Generate documents
             try {

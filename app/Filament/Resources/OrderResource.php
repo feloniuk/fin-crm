@@ -72,6 +72,15 @@ class OrderResource extends Resource
                             ->label('Коментар')
                             ->disabled()
                             ->columnSpanFull(),
+
+                        Forms\Components\Select::make('counterparty_id')
+                            ->label('Контрагент')
+                            ->relationship('counterparty', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->placeholder('Виберіть контрагента')
+                            ->helperText('Пов\'язаний контрагент (опціонально)')
+                            ->visibleOn('edit'),
                     ]),
 
                 Forms\Components\Section::make('Дані доставки')
@@ -210,7 +219,7 @@ class OrderResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with(['shop', 'invoice', 'ourCompany']))
+            ->modifyQueryUsing(fn ($query) => $query->with(['shop', 'invoice', 'ourCompany', 'counterparty']))
             ->columns([
                 Tables\Columns\TextColumn::make('shop.name')
                     ->label('Магазин')
@@ -245,6 +254,13 @@ class OrderResource extends Resource
                 Tables\Columns\TextColumn::make('delivery_type')
                     ->label('Доставка')
                     ->searchable()
+                    ->toggleable(),
+
+                Tables\Columns\TextColumn::make('counterparty.name')
+                    ->label('Контрагент')
+                    ->sortable()
+                    ->searchable()
+                    ->placeholder('—')
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('total_amount')

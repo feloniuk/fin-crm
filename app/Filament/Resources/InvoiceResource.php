@@ -93,6 +93,13 @@ class InvoiceResource extends Resource
                             ->default(false)
                             ->live()
                             ->helperText('Режим оподаткування для цього рахунку'),
+
+                        Forms\Components\Toggle::make('is_paid')
+                            ->label('Оплачено')
+                            ->default(false)
+                            ->visible(fn (Get $get): bool => !empty($get('order_id')))
+                            ->helperText('Статус оплати з замовлення')
+                            ->visibleOn('create'),
                     ])
                     ->columns(2),
 
@@ -162,29 +169,29 @@ class InvoiceResource extends Resource
 
                 Forms\Components\Section::make('Товари')
                     ->schema([
-                        // Repeater для СТВОРЕННЯ (без relationship)
+                        // CREATE mode - plain repeater filled from order
                         Forms\Components\Repeater::make('items')
                             ->label('Позиції рахунку')
-                            ->visibleOn('create')
                             ->schema(self::getItemsSchema())
                             ->columns(12)
                             ->reorderable()
                             ->collapsible()
                             ->columnSpanFull()
                             ->defaultItems(0)
-                            ->live(),
+                            ->live()
+                            ->visibleOn('create'),
 
-                        // Repeater для РЕДАГУВАННЯ (з relationship)
+                        // EDIT mode - relationship repeater
                         Forms\Components\Repeater::make('items')
                             ->label('Позиції рахунку')
-                            ->relationship()
-                            ->visibleOn('edit')
+                            ->relationship('items')
                             ->schema(self::getItemsSchema())
                             ->columns(12)
                             ->reorderable()
                             ->collapsible()
                             ->columnSpanFull()
-                            ->live(),
+                            ->live()
+                            ->visibleOn('edit'),
                     ]),
 
                 Forms\Components\Section::make('Знижка на рахунок')
@@ -246,7 +253,7 @@ class InvoiceResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with(['ourCompany', 'counterparty']))
+            ->modifyQueryUsing(fn ($query) => $query->with(['ourCompany', 'counterparty', 'items']))
             ->columns([
                 Tables\Columns\TextColumn::make('invoice_number')
                     ->label('Номер')
