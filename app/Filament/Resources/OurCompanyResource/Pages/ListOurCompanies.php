@@ -1,9 +1,9 @@
 <?php
 namespace App\Filament\Resources\OurCompanyResource\Pages;
 use App\Filament\Resources\OurCompanyResource;
+use App\Filament\Resources\Pages\BaseListRecords;
 use Filament\Actions;
-use Filament\Resources\Pages\ListRecords;
-class ListOurCompanies extends ListRecords
+class ListOurCompanies extends BaseListRecords
 {
     protected static string $resource = OurCompanyResource::class;
 

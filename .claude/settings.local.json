@@ -29,7 +29,8 @@
       "WebFetch(domain:horoshop.notion.site)",
       "WebSearch",
       "WebFetch(domain:horoshop.atlassian.net)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(find:*)"
     ]
   }
 }

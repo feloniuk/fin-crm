@@ -48,6 +48,7 @@ class TransactionRegistry extends Page implements HasTable
     {
         return $table
             ->query(Invoice::query())
+            ->persistFiltersInSession()
             ->columns([
                 Tables\Columns\TextColumn::make('invoice_number')
                     ->label('Номер рахунку')
