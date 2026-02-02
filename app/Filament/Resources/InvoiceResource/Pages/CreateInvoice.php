@@ -20,6 +20,8 @@ class CreateInvoice extends CreateRecord
 
     public ?Order $order = null;
 
+    public bool $shouldCreateAnother = false;
+
     public function mount(): void
     {
         parent::mount();
@@ -192,57 +194,64 @@ class CreateInvoice extends CreateRecord
         }
     }
 
+    protected function getRedirectUrl(): string
+    {
+        // If "create another" was triggered, find and redirect to next order
+        if ($this->shouldCreateAnother) {
+            // Get current order ID if available
+            $currentOrderId = $this->order?->id;
+
+            // Find next order with priority:
+            // 1. Orders with full info (our_company_id AND with_vat)
+            // 2. Other NEW orders without invoice
+
+            $nextOrder = Order::where('status', OrderStatus::NEW->value)
+                ->doesntHave('invoice')
+                ->where(function ($query) {
+                    $query->whereNotNull('our_company_id')
+                          ->whereNotNull('with_vat');
+                })
+                ->when($currentOrderId, fn ($q) => $q->where('id', '>', $currentOrderId))
+                ->orderBy('id', 'asc')
+                ->first();
+
+            // If no order with full info, try other NEW orders
+            if (!$nextOrder) {
+                $nextOrder = Order::where('status', OrderStatus::NEW->value)
+                    ->doesntHave('invoice')
+                    ->when($currentOrderId, fn ($q) => $q->where('id', '>', $currentOrderId))
+                    ->orderBy('id', 'asc')
+                    ->first();
+            }
+
+            if ($nextOrder) {
+                return InvoiceResource::getUrl('create', ['order_id' => $nextOrder->id]);
+            } else {
+                // If no more orders, redirect to invoice list
+                Notification::make()
+                    ->info()
+                    ->title('Інформація')
+                    ->body('Немає більше заказів для створення рахунку')
+                    ->send();
+
+                return InvoiceResource::getUrl('index');
+            }
+        }
+
+        // Default: redirect to view the created invoice
+        return $this->getResource()::getUrl('view', ['record' => $this->getRecord()]);
+    }
+
     protected function getCreateAnotherAction(): Action
     {
         return Action::make('createAnother')
             ->label('Створити та створити наступне')
             ->icon('heroicon-m-arrow-path')
             ->action(function () {
-                // First, create the invoice by calling parent's save logic
+                // Set flag to trigger special redirect logic
+                $this->shouldCreateAnother = true;
+                // Save will trigger getRedirectUrl() which handles finding the next order
                 $this->save();
-
-                // Get current order ID if available
-                $currentOrderId = $this->order?->id;
-
-                // Find next order with priority:
-                // 1. Orders with full info (our_company_id AND with_vat)
-                // 2. Other NEW orders without invoice
-
-                $nextOrder = Order::where('status', OrderStatus::NEW->value)
-                    ->doesntHave('invoice')
-                    // Priority 1: Orders with full info (can create invoice)
-                    ->where(function ($query) {
-                        $query->whereNotNull('our_company_id')
-                              ->whereNotNull('with_vat');
-                    })
-                    ->when($currentOrderId, fn ($q) => $q->where('id', '>', $currentOrderId))
-                    ->orderBy('id', 'asc')
-                    ->first();
-
-                // If no order with full info, try other NEW orders
-                if (!$nextOrder) {
-                    $nextOrder = Order::where('status', OrderStatus::NEW->value)
-                        ->doesntHave('invoice')
-                        ->when($currentOrderId, fn ($q) => $q->where('id', '>', $currentOrderId))
-                        ->orderBy('id', 'asc')
-                        ->first();
-                }
-
-                if ($nextOrder) {
-                    // Redirect to create invoice page with the next order
-                    return redirect(
-                        InvoiceResource::getUrl('create', ['order_id' => $nextOrder->id])
-                    );
-                } else {
-                    // If no more orders, redirect to invoice list
-                    Notification::make()
-                        ->info()
-                        ->title('Інформація')
-                        ->body('Немає більше заказів для створення рахунку')
-                        ->send();
-
-                    return redirect(InvoiceResource::getUrl('index'));
-                }
             })
             ->color('primary');
     }
