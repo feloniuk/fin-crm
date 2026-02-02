@@ -194,11 +194,11 @@ class CreateInvoice extends CreateRecord
         }
     }
 
-    protected function getRedirectUrl(): string
+    protected function afterSave(): void
     {
         // If "create another" was triggered, find and redirect to next order
         if ($this->shouldCreateAnother) {
-            // Get order_id from the CREATED invoice record (not from mount)
+            // Get order_id from the CREATED invoice record
             $currentOrderId = $this->getRecord()->order_id;
 
             // Find next order with priority:
@@ -211,7 +211,7 @@ class CreateInvoice extends CreateRecord
                     $query->whereNotNull('our_company_id')
                           ->whereNotNull('with_vat');
                 })
-                ->when($currentOrderId, fn ($q) => $q->where('id', '>', $currentOrderId))
+                ->where('id', '>', $currentOrderId)
                 ->orderBy('id', 'asc')
                 ->first();
 
@@ -219,25 +219,27 @@ class CreateInvoice extends CreateRecord
             if (!$nextOrder) {
                 $nextOrder = Order::where('status', OrderStatus::NEW->value)
                     ->doesntHave('invoice')
-                    ->when($currentOrderId, fn ($q) => $q->where('id', '>', $currentOrderId))
+                    ->where('id', '>', $currentOrderId)
                     ->orderBy('id', 'asc')
                     ->first();
             }
 
             if ($nextOrder) {
-                return InvoiceResource::getUrl('create', ['order_id' => $nextOrder->id]);
+                redirect(InvoiceResource::getUrl('create', ['order_id' => $nextOrder->id]))->send();
             } else {
-                // If no more orders, redirect to invoice list
                 Notification::make()
                     ->info()
                     ->title('Інформація')
                     ->body('Немає більше заказів для створення рахунку')
                     ->send();
 
-                return InvoiceResource::getUrl('index');
+                redirect(InvoiceResource::getUrl('index'))->send();
             }
         }
+    }
 
+    protected function getRedirectUrl(): string
+    {
         // Default: redirect to view the created invoice
         return $this->getResource()::getUrl('view', ['record' => $this->getRecord()]);
     }
