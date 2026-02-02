@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 
 class SyncOrdersCommand extends Command
 {
-    protected $signature = 'orders:sync {--shop= : Синхронізувати конкретний магазин} {--force : Переінціалізувати синхронізацію (загрузити всі заказы за 30 днів)}';
+    protected $signature = 'orders:sync {--shop= : Синхронізувати конкретний магазин} {--force : Переінціалізувати синхронізацію (загрузити всі заказы за 30 днів)} {--all : Синхронізувати всі активні магазини незалежно від інтервалу}';
 
     protected $description = 'Синхронізувати замовлення з магазинів';
 
@@ -17,7 +17,9 @@ class SyncOrdersCommand extends Command
     {
         $this->info('🔄 Починаємо синхронізацію замовлень...');
 
-        $shop = null;
+        $action = app(SyncOrdersAction::class);
+
+        // Sync specific shop
         if ($this->option('shop')) {
             $shop = Shop::where('id', $this->option('shop'))->orWhere('name', $this->option('shop'))->first();
 
@@ -27,36 +29,69 @@ class SyncOrdersCommand extends Command
             }
 
             $this->info("📦 Синхронізуємо магазин: {$shop->name}");
-        } else {
-            $this->info('📦 Синхронізуємо всі активні магазини');
-        }
 
-        // Якщо використовується флаг --force, скидаємо last_synced_at
-        if ($this->option('force')) {
-            $this->info('⚠️  Режим --force: переінціалізація синхронізації');
-            if ($shop) {
+            if ($this->option('force')) {
+                $this->info('⚠️  Режим --force: переінціалізація синхронізації');
                 $shop->update(['last_synced_at' => null]);
                 $this->info("✓ Скидаємо last_synced_at для магазину: {$shop->name}");
-            } else {
-                Shop::where('is_active', true)->update(['last_synced_at' => null]);
-                $this->info('✓ Скидаємо last_synced_at для всіх активних магазинів');
+            }
+
+            try {
+                $action->execute($shop);
+                $this->info('✅ Синхронізація завершена успішно');
+                return self::SUCCESS;
+            } catch (\Exception $e) {
+                $this->error('❌ Помилка під час синхронізації: ' . $e->getMessage());
+                Log::error('Order sync failed', [
+                    'shop_id' => $shop->id,
+                    'error' => $e->getMessage(),
+                ]);
+                return self::FAILURE;
             }
         }
 
-        try {
-            $action = app(SyncOrdersAction::class);
-            $action->execute($shop);
+        // Sync multiple shops based on their intervals
+        if ($this->option('force')) {
+            $this->info('⚠️  Режим --force: переінціалізація синхронізації');
+            Shop::where('is_active', true)->update(['last_synced_at' => null]);
+            $this->info('✓ Скидаємо last_synced_at для всіх активних магазинів');
+        }
 
-            $this->info('✅ Синхронізація завершена успішно');
+        // Get shops to sync
+        $shops = Shop::active()
+            ->when(!$this->option('all') && !$this->option('force'), fn($q) => $q->dueForSync())
+            ->get();
+
+        if ($shops->isEmpty()) {
+            $this->info('ℹ️  Немає магазинів для синхронізації');
             return self::SUCCESS;
-        } catch (\Exception $e) {
-            $this->error('❌ Помилка під час синхронізації: ' . $e->getMessage());
-            Log::error('Order sync failed', [
-                'shop_id' => $shop?->id,
-                'error' => $e->getMessage(),
-            ]);
+        }
 
+        $this->info("📦 Знайдено магазинів для синхронізації: {$shops->count()}");
+
+        $hasErrors = false;
+        foreach ($shops as $shop) {
+            $this->info("  → Синхронізуємо: {$shop->name}");
+
+            try {
+                $action->execute($shop);
+                $this->info("    ✓ {$shop->name} - успішно");
+            } catch (\Exception $e) {
+                $hasErrors = true;
+                $this->error("    ✗ {$shop->name} - помилка: " . $e->getMessage());
+                Log::error('Order sync failed', [
+                    'shop_id' => $shop->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if ($hasErrors) {
+            $this->warn('⚠️  Синхронізація завершена з помилками');
             return self::FAILURE;
         }
+
+        $this->info('✅ Синхронізація завершена успішно');
+        return self::SUCCESS;
     }
 }

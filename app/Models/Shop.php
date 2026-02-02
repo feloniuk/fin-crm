@@ -16,6 +16,7 @@ class Shop extends Model
         'type',
         'api_credentials',
         'is_active',
+        'sync_interval_minutes',
         'last_synced_at',
     ];
 
@@ -25,6 +26,7 @@ class Shop extends Model
             'type' => ShopType::class,
             'api_credentials' => 'array',
             'is_active' => 'boolean',
+            'sync_interval_minutes' => 'integer',
             'last_synced_at' => 'datetime',
         ];
     }
@@ -48,6 +50,16 @@ class Shop extends Model
         return $query->where('type', $type);
     }
 
+    public function scopeDueForSync($query)
+    {
+        return $query->where('is_active', true)
+            ->whereNotNull('sync_interval_minutes')
+            ->where(function ($q) {
+                $q->whereNull('last_synced_at')
+                    ->orWhereRaw('last_synced_at <= DATE_SUB(NOW(), INTERVAL sync_interval_minutes MINUTE)');
+            });
+    }
+
     // Helpers
 
     public function getApiCredential(string $key, $default = null): mixed
@@ -58,5 +70,31 @@ class Shop extends Model
     public function markSynced(): void
     {
         $this->update(['last_synced_at' => now()]);
+    }
+
+    public function shouldSync(): bool
+    {
+        if (!$this->is_active || !$this->sync_interval_minutes) {
+            return false;
+        }
+
+        if (!$this->last_synced_at) {
+            return true;
+        }
+
+        return $this->last_synced_at->addMinutes($this->sync_interval_minutes)->isPast();
+    }
+
+    public function getNextSyncAt(): ?\Carbon\Carbon
+    {
+        if (!$this->is_active || !$this->sync_interval_minutes) {
+            return null;
+        }
+
+        if (!$this->last_synced_at) {
+            return now();
+        }
+
+        return $this->last_synced_at->addMinutes($this->sync_interval_minutes);
     }
 }

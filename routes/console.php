@@ -20,8 +20,8 @@ Artisan::command('inspire', function () {
 |
 */
 
-// Sync orders from all shops every 15 minutes
-Schedule::command('orders:sync')->everyFifteenMinutes()
+// Sync orders based on individual shop intervals (checks every 5 minutes)
+Schedule::command('orders:sync')->everyFiveMinutes()
     ->withoutOverlapping()
     ->runInBackground();
 

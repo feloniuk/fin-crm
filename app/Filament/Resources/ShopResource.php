@@ -49,6 +49,22 @@ class ShopResource extends Resource
                         Forms\Components\Toggle::make('is_active')
                             ->label('Активний')
                             ->default(true),
+
+                        Forms\Components\Select::make('sync_interval_minutes')
+                            ->label('Інтервал автосинхронізації')
+                            ->options([
+                                '' => 'Вимкнено (тільки вручну)',
+                                5 => 'Кожні 5 хвилин',
+                                15 => 'Кожні 15 хвилин',
+                                30 => 'Кожні 30 хвилин',
+                                60 => 'Щогодини',
+                                120 => 'Кожні 2 години',
+                                360 => 'Кожні 6 годин',
+                                720 => 'Кожні 12 годин',
+                                1440 => 'Раз на добу',
+                            ])
+                            ->default(15)
+                            ->helperText('Як часто автоматично синхронізувати замовлення'),
                     ])
                     ->columns(2),
 
@@ -137,6 +153,36 @@ class ShopResource extends Resource
                     ->label('Остання синхронізація')
                     ->dateTime('d.m.Y H:i')
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('sync_interval_minutes')
+                    ->label('Автосинхронізація')
+                    ->formatStateUsing(function (?int $state, Shop $record): string {
+                        if (!$state) {
+                            return 'Вручну';
+                        }
+
+                        $intervals = [
+                            5 => '5 хв',
+                            15 => '15 хв',
+                            30 => '30 хв',
+                            60 => '1 год',
+                            120 => '2 год',
+                            360 => '6 год',
+                            720 => '12 год',
+                            1440 => '24 год',
+                        ];
+
+                        $intervalText = $intervals[$state] ?? "{$state} хв";
+                        $nextSync = $record->getNextSyncAt();
+
+                        if ($nextSync && $nextSync->isFuture()) {
+                            return "{$intervalText} (через " . $nextSync->diffForHumans(short: true) . ")";
+                        }
+
+                        return "{$intervalText} (очікує)";
+                    })
+                    ->badge()
+                    ->color(fn (?int $state): string => $state ? 'success' : 'gray'),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Створено')

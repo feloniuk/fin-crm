@@ -393,11 +393,30 @@ class OrderResource extends Resource
                                     ->searchable()
                                     ->preload()
                                     ->live()
-                                    ->afterStateUpdated(function (Forms\Set $set, $state) {
+                                    ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, $state) {
                                         if ($state) {
                                             $product = \App\Models\Product::find($state);
                                             if ($product) {
                                                 $set('name', $product->name);
+
+                                                // Get latest price from order items
+                                                $latestItem = \App\Models\OrderItem::where('product_id', $product->id)
+                                                    ->whereNotNull('unit_price')
+                                                    ->where('unit_price', '>', 0)
+                                                    ->latest('created_at')
+                                                    ->first();
+
+                                                $unitPrice = $latestItem?->unit_price ?? 0;
+                                                $quantity = (float) ($get('quantity') ?: 1);
+
+                                                $set('unit_price', $unitPrice);
+                                                $set('quantity', $quantity);
+
+                                                // Calculate total directly with new values
+                                                $total = $quantity * $unitPrice;
+                                                $set('total', $total);
+                                                $set('subtotal', $total);
+                                                $set('discount_amount', 0);
                                             }
                                         }
                                     })
@@ -406,7 +425,7 @@ class OrderResource extends Resource
                                 Forms\Components\TextInput::make('name')
                                     ->label('Назва товару')
                                     ->required()
-                                    ->live(onBlur: true)
+                                    ->live(debounce: 500)
                                     ->columnSpan(2),
 
                                 Forms\Components\TextInput::make('quantity')
@@ -415,7 +434,7 @@ class OrderResource extends Resource
                                     ->step(0.001)
                                     ->required()
                                     ->default(1)
-                                    ->live(onBlur: true)
+                                    ->live(debounce: 500)
                                     ->afterStateUpdated(fn (Forms\Set $set, Forms\Get $get) =>
                                         self::recalculateOrderItem($set, $get)
                                     )
@@ -426,7 +445,7 @@ class OrderResource extends Resource
                                     ->numeric()
                                     ->step(0.01)
                                     ->required()
-                                    ->live(onBlur: true)
+                                    ->live(debounce: 500)
                                     ->afterStateUpdated(fn (Forms\Set $set, Forms\Get $get) =>
                                         self::recalculateOrderItem($set, $get)
                                     )
@@ -453,7 +472,7 @@ class OrderResource extends Resource
                                     ->step(0.01)
                                     ->default(0)
                                     ->visible(fn (Forms\Get $get): bool => !empty($get('discount_type')))
-                                    ->live(onBlur: true)
+                                    ->live(debounce: 500)
                                     ->afterStateUpdated(fn (Forms\Set $set, Forms\Get $get) =>
                                         self::recalculateOrderItem($set, $get)
                                     )
