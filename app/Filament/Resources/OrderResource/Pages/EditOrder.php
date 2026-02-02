@@ -11,19 +11,15 @@ class EditOrder extends EditRecord
 {
     protected static string $resource = OrderResource::class;
 
+    public static bool $formActionsAreSticky = true;
+
     protected function getHeaderActions(): array
     {
-        return [
-            Actions\Action::make('create_invoice')
-                ->label('Створити рахунок')
-                ->icon('heroicon-o-document')
-                ->visible(fn (Order $record): bool => $record->canCreateInvoice())
-                ->url(fn (Order $record) => route('filament.admin.resources.invoices.create', ['order_id' => $record->id])),
-        ];
+        return [];
     }
 
     protected function getRedirectUrl(): string
     {
-        return $this->getResource()::getUrl('view', ['record' => $this->getRecord()]);
+        return $this->getResource()::getUrl('index');
     }
 }

@@ -25,8 +25,8 @@ class OrderPolicy
 
     public function update(User $user, Order $order): bool
     {
-        // Orders can only be updated by sync process
-        return false;
+        // Can edit order if no invoice created yet
+        return !$order->invoice;
     }
 
     public function delete(User $user, Order $order): bool
