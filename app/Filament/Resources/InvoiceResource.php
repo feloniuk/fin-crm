@@ -7,6 +7,7 @@ use App\Filament\Resources\InvoiceResource\Pages;
 use App\Models\Counterparty;
 use App\Models\Invoice;
 use App\Models\OurCompany;
+use App\Models\Product;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -423,9 +424,21 @@ class InvoiceResource extends Resource
     protected static function getItemsSchema(): array
     {
         return [
-            Forms\Components\TextInput::make('name')
+            Forms\Components\Select::make('name')
                 ->label('Товар')
                 ->required()
+                ->options(fn () => Product::orderBy('name')->pluck('name', 'name'))
+                ->searchable()
+                ->native(false)
+                ->createOptionForm([
+                    Forms\Components\TextInput::make('name')
+                        ->label('Назва товару')
+                        ->required(),
+                ])
+                ->createOptionUsing(function (array $data): string {
+                    Product::firstOrCreate(['name' => $data['name']]);
+                    return $data['name'];
+                })
                 ->columnSpan(3),
 
             Forms\Components\TextInput::make('quantity')
