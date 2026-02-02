@@ -198,8 +198,8 @@ class CreateInvoice extends CreateRecord
     {
         // If "create another" was triggered, find and redirect to next order
         if ($this->shouldCreateAnother) {
-            // Get current order ID if available
-            $currentOrderId = $this->order?->id;
+            // Get order_id from the CREATED invoice record (not from mount)
+            $currentOrderId = $this->getRecord()->order_id;
 
             // Find next order with priority:
             // 1. Orders with full info (our_company_id AND with_vat)
@@ -245,7 +245,7 @@ class CreateInvoice extends CreateRecord
     protected function getCreateAnotherAction(): Action
     {
         return Action::make('createAnother')
-            ->label('Створити та створити наступне')
+            ->label('Створити та відкрити наступне')
             ->icon('heroicon-m-arrow-path')
             ->action(function () {
                 // Set flag to trigger special redirect logic
