@@ -20,10 +20,6 @@ class CreateInvoice extends CreateRecord
 
     public ?Order $order = null;
 
-    public bool $shouldCreateAnother = false;
-
-    public ?int $processedOrderId = null;
-
     public function mount(): void
     {
         parent::mount();
@@ -64,37 +60,47 @@ class CreateInvoice extends CreateRecord
         if ($this->order->items()->exists()) {
             // Use order_items with discounts applied
             $items = $this->order->items()->get()->map(function ($item) {
+                $quantity = (float) $item->quantity;
+                $unitPrice = (float) $item->unit_price;
+                $discountType = $item->discount_type ?? '';
+                $discountValue = (float) ($item->discount_value ?? 0);
+
+                // Calculate total consistently
+                $subtotal = $quantity * $unitPrice;
+                $discountAmount = 0;
+                if ($discountType === 'percent' && $discountValue > 0) {
+                    $discountAmount = $subtotal * ($discountValue / 100);
+                } elseif ($discountType === 'fixed' && $discountValue > 0) {
+                    $discountAmount = min($discountValue, $subtotal);
+                }
+                $total = max(0, $subtotal - $discountAmount);
+
                 return [
                     'name' => $item->name,
-                    'quantity' => (float) $item->quantity,
+                    'quantity' => $quantity,
                     'unit' => $item->unit ?? 'шт.',
-                    'unit_price' => (float) $item->unit_price,
-                    'discount_type' => $item->discount_type ?? '',
-                    'discount_value' => (float) ($item->discount_value ?? 0),
-                    'total' => (float) $item->total,
+                    'unit_price' => $unitPrice,
+                    'discount_type' => $discountType,
+                    'discount_value' => $discountValue,
+                    'total' => $total,
                 ];
             })->toArray();
-            \Log::info('Order items found', [
-                'order_id' => $this->order->id,
-                'items_count' => count($items),
-            ]);
         } else {
             // Fallback to raw_data for legacy orders
             $items = collect($this->order->getItemsFromRawData())->map(function ($item) {
+                $quantity = (float) $item['quantity'];
+                $unitPrice = (float) $item['unit_price'];
+
                 return [
                     'name' => $item['name'],
-                    'quantity' => (float) $item['quantity'],
+                    'quantity' => $quantity,
                     'unit' => 'шт.',
-                    'unit_price' => (float) $item['unit_price'],
+                    'unit_price' => $unitPrice,
                     'discount_type' => '',
                     'discount_value' => 0,
-                    'total' => (float) ($item['quantity'] * $item['unit_price']),
+                    'total' => $quantity * $unitPrice,
                 ];
             })->toArray();
-            \Log::info('Using fallback raw_data items', [
-                'order_id' => $this->order->id,
-                'items_count' => count($items),
-            ]);
         }
 
         $this->form->fill([
@@ -115,18 +121,6 @@ class CreateInvoice extends CreateRecord
         // Store complete form data before processing
         $this->data = $data;
 
-        // Save the order_id we're processing for later redirect
-        if ($this->shouldCreateAnother && !empty($data['order_id'])) {
-            $this->processedOrderId = $data['order_id'];
-        }
-
-        \Log::info('Invoice form data before create', [
-            'order_id' => $data['order_id'] ?? null,
-            'our_company_id' => $data['our_company_id'] ?? null,
-            'counterparty_id' => $data['counterparty_id'] ?? null,
-            'items_count' => count($data['items'] ?? []),
-        ]);
-
         return [];
     }
 
@@ -135,8 +129,6 @@ class CreateInvoice extends CreateRecord
         try {
             // Get all form data
             $formData = $this->data ?? $data;
-
-            \Log::info('Invoice creating with data', ['data_keys' => array_keys($formData)]);
 
             // Extract values
             $orderId = $formData['order_id'] ?? null;
@@ -148,14 +140,6 @@ class CreateInvoice extends CreateRecord
             $discountType = DiscountType::tryFrom($formData['discount_type'] ?? '') ?? DiscountType::NONE;
             $discountValue = (float) ($formData['discount_value'] ?? 0);
             $isPaid = (bool) ($formData['is_paid'] ?? false);
-
-            \Log::info('Extracted values', [
-                'ourCompanyId' => $ourCompanyId,
-                'counterpartyId' => $counterpartyId,
-                'orderId' => $orderId,
-                'items_count' => count($items),
-                'items_sample' => array_slice($items, 0, 1),
-            ]);
 
             // Validate required fields
             if (empty($ourCompanyId)) {
@@ -201,17 +185,23 @@ class CreateInvoice extends CreateRecord
         }
     }
 
-    protected function afterSave(): void
+    protected function getRedirectUrl(): string
     {
-        // If "create another" was triggered, find and redirect to next order
-        if ($this->shouldCreateAnother && $this->processedOrderId) {
-            // Use the order_id we saved BEFORE creation
-            $currentOrderId = $this->processedOrderId;
+        // Default: redirect to view the created invoice
+        return $this->getResource()::getUrl('view', ['record' => $this->getRecord()]);
+    }
 
-            // Find next order with priority:
-            // 1. Orders with full info (our_company_id AND with_vat)
-            // 2. Other NEW orders without invoice
+    public function createAndNext(): void
+    {
+        // Get form data before save
+        $formData = $this->form->getState();
+        $currentOrderId = $formData['order_id'] ?? null;
 
+        // Create the invoice
+        $this->create(another: false);
+
+        // Find next order
+        if ($currentOrderId) {
             $nextOrder = Order::where('status', OrderStatus::NEW->value)
                 ->doesntHave('invoice')
                 ->where(function ($query) {
@@ -222,7 +212,6 @@ class CreateInvoice extends CreateRecord
                 ->orderBy('id', 'asc')
                 ->first();
 
-            // If no order with full info, try other NEW orders
             if (!$nextOrder) {
                 $nextOrder = Order::where('status', OrderStatus::NEW->value)
                     ->doesntHave('invoice')
@@ -232,36 +221,30 @@ class CreateInvoice extends CreateRecord
             }
 
             if ($nextOrder) {
-                redirect(InvoiceResource::getUrl('create', ['order_id' => $nextOrder->id]))->send();
-            } else {
-                Notification::make()
-                    ->info()
-                    ->title('Інформація')
-                    ->body('Немає більше заказів для створення рахунку')
-                    ->send();
-
-                redirect(InvoiceResource::getUrl('index'))->send();
+                $this->redirect(InvoiceResource::getUrl('create', ['order_id' => $nextOrder->id]));
+                return;
             }
         }
+
+        Notification::make()
+            ->info()
+            ->title('Інформація')
+            ->body('Немає більше заказів для створення рахунку')
+            ->send();
+
+        $this->redirect(InvoiceResource::getUrl('index'));
     }
 
-    protected function getRedirectUrl(): string
+    protected function getFormActions(): array
     {
-        // Default: redirect to view the created invoice
-        return $this->getResource()::getUrl('view', ['record' => $this->getRecord()]);
-    }
-
-    protected function getCreateAnotherAction(): Action
-    {
-        return Action::make('createAnother')
-            ->label('Створити та відкрити наступне')
-            ->icon('heroicon-m-arrow-path')
-            ->action(function () {
-                // Set flag to trigger special redirect logic
-                $this->shouldCreateAnother = true;
-                // Save will trigger getRedirectUrl() which handles finding the next order
-                $this->save();
-            })
-            ->color('primary');
+        return [
+            $this->getCreateFormAction(),
+            Action::make('createAndNext')
+                ->label('Створити та відкрити наступне')
+                ->icon('heroicon-m-arrow-path')
+                ->color('primary')
+                ->action('createAndNext'),
+            $this->getCancelFormAction(),
+        ];
     }
 }

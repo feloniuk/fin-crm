@@ -30,7 +30,8 @@
       "WebSearch",
       "WebFetch(domain:horoshop.atlassian.net)",
       "Bash(grep:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "WebFetch(domain:filamentphp.com)"
     ]
   }
 }

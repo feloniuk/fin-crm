@@ -85,10 +85,16 @@ class OurCompanyResource extends Resource
                     ->schema([
                         Forms\Components\Repeater::make('bank_details')
                             ->label('Банківські рахунки')
+                            ->itemLabel(fn (array $state): ?string =>
+                                !empty($state['bank_name'])
+                                    ? $state['bank_name'] . (!empty($state['iban']) ? ' — ' . $state['iban'] : '')
+                                    : 'Новий рахунок'
+                            )
                             ->schema([
                                 Forms\Components\TextInput::make('bank_name')
                                     ->label('Назва банку')
-                                    ->maxLength(255),
+                                    ->maxLength(255)
+                                    ->live(onBlur: true),
 
                                 Forms\Components\TextInput::make('mfo')
                                     ->label('МФО')
@@ -100,7 +106,8 @@ class OurCompanyResource extends Resource
 
                                 Forms\Components\TextInput::make('iban')
                                     ->label('IBAN')
-                                    ->length(29),
+                                    ->length(29)
+                                    ->live(onBlur: true),
                             ])
                             ->columns(2)
                             ->collapsible()

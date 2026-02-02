@@ -186,9 +186,51 @@ class InvoiceResource extends Resource
                             ->columns(12)
                             ->reorderable()
                             ->collapsible()
+                            ->itemLabel(function (array $state): ?string {
+                                if (empty($state['name'])) {
+                                    return 'Новий товар';
+                                }
+                                $quantity = (float) ($state['quantity'] ?? 0);
+                                $unitPrice = (float) ($state['unit_price'] ?? 0);
+                                $discountType = $state['discount_type'] ?? '';
+                                $discountValue = (float) ($state['discount_value'] ?? 0);
+
+                                $subtotal = $quantity * $unitPrice;
+                                $discountAmount = 0;
+                                if ($discountType === 'percent' && $discountValue > 0) {
+                                    $discountAmount = $subtotal * ($discountValue / 100);
+                                } elseif ($discountType === 'fixed' && $discountValue > 0) {
+                                    $discountAmount = min($discountValue, $subtotal);
+                                }
+                                $total = max(0, $subtotal - $discountAmount);
+
+                                return $state['name'] . ' — ' . number_format($total, 2, ',', ' ') . ' грн';
+                            })
                             ->columnSpanFull()
                             ->defaultItems(0)
                             ->live()
+                            ->afterStateHydrated(function ($state, Set $set, $component) {
+                                // Recalculate total for each item after form hydration
+                                if (is_array($state)) {
+                                    foreach ($state as $key => $item) {
+                                        $quantity = (float) ($item['quantity'] ?? 0);
+                                        $unitPrice = (float) ($item['unit_price'] ?? 0);
+                                        $discountType = $item['discount_type'] ?? '';
+                                        $discountValue = (float) ($item['discount_value'] ?? 0);
+
+                                        $subtotal = $quantity * $unitPrice;
+                                        $discountAmount = 0;
+                                        if ($discountType === 'percent' && $discountValue > 0) {
+                                            $discountAmount = $subtotal * ($discountValue / 100);
+                                        } elseif ($discountType === 'fixed' && $discountValue > 0) {
+                                            $discountAmount = min($discountValue, $subtotal);
+                                        }
+                                        $total = max(0, $subtotal - $discountAmount);
+
+                                        $set("items.{$key}.total", $total);
+                                    }
+                                }
+                            })
                             ->visibleOn('create'),
 
                         // EDIT/VIEW mode - relationship repeater
@@ -199,8 +241,50 @@ class InvoiceResource extends Resource
                             ->columns(12)
                             ->reorderable()
                             ->collapsible()
+                            ->itemLabel(function (array $state): ?string {
+                                if (empty($state['name'])) {
+                                    return 'Новий товар';
+                                }
+                                $quantity = (float) ($state['quantity'] ?? 0);
+                                $unitPrice = (float) ($state['unit_price'] ?? 0);
+                                $discountType = $state['discount_type'] ?? '';
+                                $discountValue = (float) ($state['discount_value'] ?? 0);
+
+                                $subtotal = $quantity * $unitPrice;
+                                $discountAmount = 0;
+                                if ($discountType === 'percent' && $discountValue > 0) {
+                                    $discountAmount = $subtotal * ($discountValue / 100);
+                                } elseif ($discountType === 'fixed' && $discountValue > 0) {
+                                    $discountAmount = min($discountValue, $subtotal);
+                                }
+                                $total = max(0, $subtotal - $discountAmount);
+
+                                return $state['name'] . ' — ' . number_format($total, 2, ',', ' ') . ' грн';
+                            })
                             ->columnSpanFull()
                             ->live()
+                            ->afterStateHydrated(function ($state, Set $set, $component) {
+                                // Recalculate total for each item after form hydration
+                                if (is_array($state)) {
+                                    foreach ($state as $key => $item) {
+                                        $quantity = (float) ($item['quantity'] ?? 0);
+                                        $unitPrice = (float) ($item['unit_price'] ?? 0);
+                                        $discountType = $item['discount_type'] ?? '';
+                                        $discountValue = (float) ($item['discount_value'] ?? 0);
+
+                                        $subtotal = $quantity * $unitPrice;
+                                        $discountAmount = 0;
+                                        if ($discountType === 'percent' && $discountValue > 0) {
+                                            $discountAmount = $subtotal * ($discountValue / 100);
+                                        } elseif ($discountType === 'fixed' && $discountValue > 0) {
+                                            $discountAmount = min($discountValue, $subtotal);
+                                        }
+                                        $total = max(0, $subtotal - $discountAmount);
+
+                                        $set("items.{$key}.total", $total);
+                                    }
+                                }
+                            })
                             ->visibleOn(['edit', 'view']),
                     ]),
 

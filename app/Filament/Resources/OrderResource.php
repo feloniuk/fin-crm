@@ -185,13 +185,65 @@ class OrderResource extends Resource
                     ->visibleOn('edit')
                     ->visible(fn (Order $record): bool => $record->status->canCreateInvoice()),
 
+                // VIEW mode - readonly items
                 Forms\Components\Section::make('Товари замовлення')
                     ->schema([
-                        Forms\Components\Placeholder::make('items_count')
-                            ->label('Кількість позицій')
-                            ->content(fn (Order $record): string =>
-                                $record->items()->count() ?? '0'
-                            ),
+                        Forms\Components\Repeater::make('items')
+                            ->label('')
+                            ->relationship('items')
+                            ->schema([
+                                Forms\Components\TextInput::make('name')
+                                    ->label('Товар')
+                                    ->disabled()
+                                    ->columnSpan(3),
+
+                                Forms\Components\TextInput::make('quantity')
+                                    ->label('Кількість')
+                                    ->disabled()
+                                    ->formatStateUsing(fn ($state) =>
+                                        is_numeric($state) ? rtrim(rtrim(number_format((float)$state, 3, ',', ' '), '0'), ',') : $state
+                                    )
+                                    ->columnSpan(1),
+
+                                Forms\Components\TextInput::make('unit_price')
+                                    ->label('Ціна')
+                                    ->disabled()
+                                    ->formatStateUsing(fn ($state) =>
+                                        number_format((float)($state ?? 0), 2, ',', ' ') . ' грн'
+                                    )
+                                    ->columnSpan(2),
+
+                                Forms\Components\TextInput::make('discount_display')
+                                    ->label('Знижка')
+                                    ->disabled()
+                                    ->formatStateUsing(fn ($state, $record) =>
+                                        match($record?->discount_type) {
+                                            'percent' => number_format($record->discount_value ?? 0, 0) . '%',
+                                            'fixed' => number_format($record->discount_value ?? 0, 2, ',', ' ') . ' грн',
+                                            default => '—'
+                                        }
+                                    )
+                                    ->columnSpan(2),
+
+                                Forms\Components\TextInput::make('total')
+                                    ->label('Сума')
+                                    ->disabled()
+                                    ->formatStateUsing(fn ($state) =>
+                                        number_format((float)($state ?? 0), 2, ',', ' ') . ' грн'
+                                    )
+                                    ->columnSpan(2),
+                            ])
+                            ->columns(10)
+                            ->collapsible()
+                            ->itemLabel(fn (array $state): ?string =>
+                                !empty($state['name'])
+                                    ? $state['name'] . ' — ' . number_format((float)($state['total'] ?? 0), 2, ',', ' ') . ' грн'
+                                    : 'Товар'
+                            )
+                            ->addable(false)
+                            ->deletable(false)
+                            ->reorderable(false)
+                            ->columnSpanFull(),
 
                         Forms\Components\Placeholder::make('items_subtotal')
                             ->label('Сума без знижок')
@@ -211,7 +263,137 @@ class OrderResource extends Resource
                                 number_format(($record->subtotal ?? 0) - ($record->discount_total ?? 0), 2, ',', ' ') . ' грн'
                             ),
                     ])
-                    ->columns(2)
+                    ->columns(3)
+                    ->visibleOn('view'),
+
+                // EDIT mode - editable items
+                Forms\Components\Section::make('Товари замовлення')
+                    ->schema([
+                        Forms\Components\Repeater::make('items')
+                            ->label('')
+                            ->relationship('items')
+                            ->itemLabel(function (array $state): ?string {
+                                if (empty($state['name'])) {
+                                    return 'Новий товар';
+                                }
+                                $quantity = (float) ($state['quantity'] ?? 0);
+                                $unitPrice = (float) ($state['unit_price'] ?? 0);
+                                $discountType = $state['discount_type'] ?? '';
+                                $discountValue = (float) ($state['discount_value'] ?? 0);
+
+                                $subtotal = $quantity * $unitPrice;
+                                $discountAmount = 0;
+                                if ($discountType === 'percent' && $discountValue > 0) {
+                                    $discountAmount = $subtotal * ($discountValue / 100);
+                                } elseif ($discountType === 'fixed' && $discountValue > 0) {
+                                    $discountAmount = min($discountValue, $subtotal);
+                                }
+                                $total = max(0, $subtotal - $discountAmount);
+
+                                return $state['name'] . ' — ' . number_format($total, 2, ',', ' ') . ' грн';
+                            })
+                            ->schema([
+                                Forms\Components\Select::make('product_id')
+                                    ->label('Товар з каталогу')
+                                    ->options(\App\Models\Product::pluck('name', 'id'))
+                                    ->searchable()
+                                    ->preload()
+                                    ->live()
+                                    ->afterStateUpdated(function (Forms\Set $set, $state) {
+                                        if ($state) {
+                                            $product = \App\Models\Product::find($state);
+                                            if ($product) {
+                                                $set('name', $product->name);
+                                            }
+                                        }
+                                    })
+                                    ->columnSpan(2),
+
+                                Forms\Components\TextInput::make('name')
+                                    ->label('Назва товару')
+                                    ->required()
+                                    ->live(onBlur: true)
+                                    ->columnSpan(2),
+
+                                Forms\Components\TextInput::make('quantity')
+                                    ->label('Кількість')
+                                    ->numeric()
+                                    ->step(0.001)
+                                    ->required()
+                                    ->default(1)
+                                    ->live(onBlur: true)
+                                    ->afterStateUpdated(fn (Forms\Set $set, Forms\Get $get) =>
+                                        self::recalculateOrderItem($set, $get)
+                                    )
+                                    ->columnSpan(1),
+
+                                Forms\Components\TextInput::make('unit_price')
+                                    ->label('Ціна')
+                                    ->numeric()
+                                    ->step(0.01)
+                                    ->required()
+                                    ->live(onBlur: true)
+                                    ->afterStateUpdated(fn (Forms\Set $set, Forms\Get $get) =>
+                                        self::recalculateOrderItem($set, $get)
+                                    )
+                                    ->columnSpan(1),
+
+                                Forms\Components\Select::make('discount_type')
+                                    ->label('Тип знижки')
+                                    ->options([
+                                        '' => 'Без знижки',
+                                        'percent' => 'Відсоток (%)',
+                                        'fixed' => 'Сума (грн)',
+                                    ])
+                                    ->default('')
+                                    ->live()
+                                    ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get) {
+                                        $set('discount_value', 0);
+                                        self::recalculateOrderItem($set, $get);
+                                    })
+                                    ->columnSpan(1),
+
+                                Forms\Components\TextInput::make('discount_value')
+                                    ->label('Знижка')
+                                    ->numeric()
+                                    ->step(0.01)
+                                    ->default(0)
+                                    ->visible(fn (Forms\Get $get): bool => !empty($get('discount_type')))
+                                    ->live(onBlur: true)
+                                    ->afterStateUpdated(fn (Forms\Set $set, Forms\Get $get) =>
+                                        self::recalculateOrderItem($set, $get)
+                                    )
+                                    ->columnSpan(1),
+
+                                Forms\Components\Placeholder::make('total_display')
+                                    ->label('Сума')
+                                    ->content(function (Forms\Get $get): string {
+                                        $quantity = (float) ($get('quantity') ?? 0);
+                                        $unitPrice = (float) ($get('unit_price') ?? 0);
+                                        $discountType = $get('discount_type');
+                                        $discountValue = (float) ($get('discount_value') ?? 0);
+
+                                        $subtotal = $quantity * $unitPrice;
+                                        $discountAmount = 0;
+                                        if ($discountType === 'percent' && $discountValue > 0) {
+                                            $discountAmount = $subtotal * ($discountValue / 100);
+                                        } elseif ($discountType === 'fixed' && $discountValue > 0) {
+                                            $discountAmount = min($discountValue, $subtotal);
+                                        }
+                                        $total = max(0, $subtotal - $discountAmount);
+
+                                        return number_format($total, 2, ',', ' ') . ' грн';
+                                    })
+                                    ->columnSpan(2),
+                            ])
+                            ->columns(10)
+                            ->collapsible()
+                            ->live()
+                            ->reorderable()
+                            ->addable(fn (?Order $record): bool => ($record?->status->canCreateInvoice() && !$record?->invoice) ?? true)
+                            ->deletable(fn (?Order $record): bool => ($record?->status->canCreateInvoice() && !$record?->invoice) ?? true)
+                            ->columnSpanFull(),
+                    ])
                     ->visibleOn('edit'),
             ]);
     }
@@ -219,7 +401,7 @@ class OrderResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with(['shop', 'invoice', 'ourCompany', 'counterparty']))
+            ->modifyQueryUsing(fn ($query) => $query->with(['shop', 'invoice', 'ourCompany', 'counterparty', 'items']))
             ->columns([
                 Tables\Columns\TextColumn::make('shop.name')
                     ->label('Магазин')
@@ -357,8 +539,41 @@ class OrderResource extends Resource
                     }),
             ])
             ->actions([
+                Tables\Actions\Action::make('viewItems')
+                    ->label('')
+                    ->tooltip('Переглянути товари')
+                    ->icon('heroicon-o-shopping-bag')
+                    ->color('gray')
+                    ->modalHeading(fn (Order $record) => "Товари замовлення #{$record->order_number}")
+                    ->modalContent(fn (Order $record) => new \Illuminate\Support\HtmlString(
+                        $record->items->count() > 0
+                            ? '<table class="w-full text-sm"><thead class="bg-gray-50 dark:bg-gray-800"><tr>' .
+                              '<th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Товар</th>' .
+                              '<th class="px-3 py-2 text-right font-medium text-gray-600 dark:text-gray-300">К-сть</th>' .
+                              '<th class="px-3 py-2 text-right font-medium text-gray-600 dark:text-gray-300">Ціна</th>' .
+                              '<th class="px-3 py-2 text-right font-medium text-gray-600 dark:text-gray-300">Знижка</th>' .
+                              '<th class="px-3 py-2 text-right font-medium text-gray-600 dark:text-gray-300">Сума</th>' .
+                              '</tr></thead><tbody class="divide-y divide-gray-200 dark:divide-gray-700">' .
+                              $record->items->map(fn ($item) =>
+                                  '<tr><td class="px-3 py-2 text-gray-900 dark:text-gray-100">' . e($item->name) . '</td>' .
+                                  '<td class="px-3 py-2 text-right text-gray-600 dark:text-gray-400">' . number_format($item->quantity, 2, ',', ' ') . '</td>' .
+                                  '<td class="px-3 py-2 text-right text-gray-600 dark:text-gray-400">' . number_format($item->unit_price, 2, ',', ' ') . '</td>' .
+                                  '<td class="px-3 py-2 text-right text-gray-600 dark:text-gray-400">' .
+                                      match($item->discount_type) { 'percent' => number_format($item->discount_value, 0) . '%', 'fixed' => number_format($item->discount_value, 2, ',', ' ') . ' грн', default => '—' } .
+                                  '</td>' .
+                                  '<td class="px-3 py-2 text-right font-medium text-gray-900 dark:text-gray-100">' . number_format($item->total, 2, ',', ' ') . ' грн</td></tr>'
+                              )->join('') .
+                              '</tbody><tfoot class="bg-gray-50 dark:bg-gray-800 font-medium"><tr>' .
+                              '<td colspan="4" class="px-3 py-2 text-right text-gray-600 dark:text-gray-300">Всього:</td>' .
+                              '<td class="px-3 py-2 text-right text-gray-900 dark:text-gray-100">' . number_format($record->items->sum('total'), 2, ',', ' ') . ' грн</td>' .
+                              '</tr></tfoot></table>'
+                            : '<div class="text-center py-6 text-gray-500 dark:text-gray-400">Товари не знайдено</div>'
+                    ))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Закрити'),
+
                 Tables\Actions\Action::make('createInvoice')
-                    ->label('Створити рахунок')
+                    ->label('Рахунок')
                     ->icon('heroicon-o-document-plus')
                     ->color('success')
                     ->visible(fn (Order $record) => $record->canCreateInvoice())
@@ -430,6 +645,28 @@ class OrderResource extends Resource
         return [
             'index' => Pages\ListOrders::route('/'),
             'view' => Pages\ViewOrder::route('/{record}'),
+            'edit' => Pages\EditOrder::route('/{record}/edit'),
         ];
+    }
+
+    protected static function recalculateOrderItem(Forms\Set $set, Forms\Get $get): void
+    {
+        $quantity = (float) ($get('quantity') ?? 0);
+        $unitPrice = (float) ($get('unit_price') ?? 0);
+        $discountType = $get('discount_type');
+        $discountValue = (float) ($get('discount_value') ?? 0);
+
+        $subtotal = $quantity * $unitPrice;
+        $discountAmount = 0;
+        if ($discountType === 'percent' && $discountValue > 0) {
+            $discountAmount = $subtotal * ($discountValue / 100);
+        } elseif ($discountType === 'fixed' && $discountValue > 0) {
+            $discountAmount = min($discountValue, $subtotal);
+        }
+
+        $total = max(0, $subtotal - $discountAmount);
+        $set('total', $total);
+        $set('subtotal', $subtotal);
+        $set('discount_amount', $discountAmount);
     }
 }
