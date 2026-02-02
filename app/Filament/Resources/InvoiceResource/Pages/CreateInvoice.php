@@ -22,6 +22,8 @@ class CreateInvoice extends CreateRecord
 
     public bool $shouldCreateAnother = false;
 
+    public ?int $processedOrderId = null;
+
     public function mount(): void
     {
         parent::mount();
@@ -113,6 +115,11 @@ class CreateInvoice extends CreateRecord
         // Store complete form data before processing
         $this->data = $data;
 
+        // Save the order_id we're processing for later redirect
+        if ($this->shouldCreateAnother && !empty($data['order_id'])) {
+            $this->processedOrderId = $data['order_id'];
+        }
+
         \Log::info('Invoice form data before create', [
             'order_id' => $data['order_id'] ?? null,
             'our_company_id' => $data['our_company_id'] ?? null,
@@ -197,9 +204,9 @@ class CreateInvoice extends CreateRecord
     protected function afterSave(): void
     {
         // If "create another" was triggered, find and redirect to next order
-        if ($this->shouldCreateAnother) {
-            // Get order_id from the CREATED invoice record
-            $currentOrderId = $this->getRecord()->order_id;
+        if ($this->shouldCreateAnother && $this->processedOrderId) {
+            // Use the order_id we saved BEFORE creation
+            $currentOrderId = $this->processedOrderId;
 
             // Find next order with priority:
             // 1. Orders with full info (our_company_id AND with_vat)
