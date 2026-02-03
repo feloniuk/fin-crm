@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\DiscountType;
 use App\Enums\OrderStatus;
 use App\Filament\Resources\OrderResource\Pages;
 use App\Models\Order;
@@ -162,123 +163,6 @@ class OrderResource extends Resource
                     ])
                     ->columns(2),
 
-                Forms\Components\Section::make('Компанія та ПДВ')
-                    ->description('Виберіть компанію-виконавця та режим оподаткування для цього замовлення')
-                    ->schema([
-                        Forms\Components\Select::make('our_company_id')
-                            ->label('Компанія-виконавець')
-                            ->relationship('ourCompany', 'name')
-                            ->searchable()
-                            ->preload()
-                            ->live()
-                            ->helperText('Компанія, яка буде виконувати замовлення'),
-
-                        Forms\Components\Toggle::make('with_vat')
-                            ->label('З ПДВ')
-                            ->default(false)
-                            ->live()
-                            ->dehydrateStateUsing(fn ($state) => (bool) $state)
-                            ->helperText('Чи буде рахунок з ПДВ (20%)'),
-
-                        Forms\Components\Actions::make([
-                            Forms\Components\Actions\Action::make('createInvoice')
-                                ->label('Створити рахунок і відкрити наступний')
-                                ->icon('heroicon-o-document-plus')
-                                ->color('success')
-                                ->size('lg')
-                                ->visible(fn (Forms\Get $get, ?Order $record): bool =>
-                                    !empty($get('our_company_id')) &&
-                                    $get('with_vat') !== null &&
-                                    $record &&
-                                    !$record->invoice &&
-                                    $record->items()->exists()
-                                )
-                                ->action(function (Order $record, Forms\Get $get, $livewire) {
-                                    // 1. Save order data
-                                    $record->update([
-                                        'our_company_id' => $get('our_company_id'),
-                                        'with_vat' => (bool) $get('with_vat'),
-                                    ]);
-                                    $record->refresh();
-
-                                    // 2. Create invoice
-                                    $company = \App\Models\OurCompany::find($get('our_company_id'));
-                                    $counterparty = $record->counterparty;
-
-                                    if (!$counterparty && $record->customer_phone) {
-                                        $counterparty = \App\Models\Counterparty::where('phone', $record->customer_phone)->first();
-                                    }
-                                    if (!$counterparty) {
-                                        $counterparty = \App\Models\Counterparty::create([
-                                            'name' => $record->customer_name,
-                                            'phone' => $record->customer_phone,
-                                            'address' => $record->delivery_address,
-                                            'is_auto_created' => true,
-                                        ]);
-                                    }
-
-                                    $items = $record->items->map(fn ($item) => [
-                                        'name' => $item->name,
-                                        'quantity' => (float) $item->quantity,
-                                        'unit' => $item->unit ?? 'шт.',
-                                        'unit_price' => (float) $item->unit_price,
-                                        'discount_type' => $item->discount_type ?? '',
-                                        'discount_value' => (float) ($item->discount_value ?? 0),
-                                        'total' => (float) $item->total,
-                                    ])->toArray();
-
-                                    $action = app(\App\Actions\Invoice\CreateInvoiceAction::class);
-                                    $invoice = $action->execute(
-                                        company: $company,
-                                        counterparty: $counterparty,
-                                        items: $items,
-                                        withVat: (bool) $get('with_vat'),
-                                        order: $record,
-                                        isPaid: (bool) $record->payed,
-                                    );
-
-                                    \Filament\Notifications\Notification::make()
-                                        ->success()
-                                        ->title('Рахунок створено')
-                                        ->body("Рахунок {$invoice->invoice_number} успішно створено")
-                                        ->send();
-
-                                    // 3. Find next order
-                                    $nextOrder = Order::where('status', \App\Enums\OrderStatus::NEW->value)
-                                        ->doesntHave('invoice')
-                                        ->where(function ($query) {
-                                            $query->whereNotNull('our_company_id')
-                                                  ->whereNotNull('with_vat');
-                                        })
-                                        ->where('id', '>', $record->id)
-                                        ->orderBy('id', 'asc')
-                                        ->first();
-
-                                    if (!$nextOrder) {
-                                        $nextOrder = Order::where('status', \App\Enums\OrderStatus::NEW->value)
-                                            ->doesntHave('invoice')
-                                            ->where('id', '>', $record->id)
-                                            ->orderBy('id', 'asc')
-                                            ->first();
-                                    }
-
-                                    // 4. Redirect
-                                    if ($nextOrder) {
-                                        $livewire->redirect(static::getUrl('edit', ['record' => $nextOrder]));
-                                    } else {
-                                        \Filament\Notifications\Notification::make()
-                                            ->info()
-                                            ->title('Готово')
-                                            ->body('Немає більше замовлень для обробки')
-                                            ->send();
-                                        $livewire->redirect(static::getUrl('index'));
-                                    }
-                                }),
-                        ])->columnSpanFull(),
-                    ])
-                    ->columns(2)
-                    ->visibleOn('edit'),
-
                 // VIEW mode - readonly items
                 Forms\Components\Section::make('Товари замовлення')
                     ->schema([
@@ -294,9 +178,6 @@ class OrderResource extends Resource
                                 Forms\Components\TextInput::make('quantity')
                                     ->label('Кількість')
                                     ->disabled()
-                                    ->formatStateUsing(fn ($state) =>
-                                        is_numeric($state) ? rtrim(rtrim(number_format((float)$state, 3, ',', ' '), '0'), ',') : $state
-                                    )
                                     ->columnSpan(1),
 
                                 Forms\Components\TextInput::make('unit_price')
@@ -431,7 +312,7 @@ class OrderResource extends Resource
                                 Forms\Components\TextInput::make('quantity')
                                     ->label('Кількість')
                                     ->numeric()
-                                    ->step(0.001)
+                                    ->step(1)
                                     ->required()
                                     ->default(1)
                                     ->live(debounce: 500)
@@ -508,6 +389,139 @@ class OrderResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->visibleOn('edit'),
+
+                Forms\Components\Section::make('Знижка на замовлення')
+                    ->schema([
+                        Forms\Components\Select::make('discount_type')
+                            ->label('Тип знижки')
+                            ->options([
+                                'none' => 'Без знижки',
+                                'percent' => 'Відсоток (%)',
+                                'fixed' => 'Сума (грн)',
+                            ])
+                            ->default('none')
+                            ->live(),
+
+                        Forms\Components\TextInput::make('discount_value')
+                            ->label('Значення')
+                            ->numeric()
+                            ->step(0.01)
+                            ->default(0)
+                            ->visible(fn (Forms\Get $get) =>
+                                !empty($get('discount_type')) && $get('discount_type') !== 'none'
+                            )
+                            ->live(),
+                    ])
+                    ->columns(2)
+                    ->visibleOn('edit'),
+
+                Forms\Components\Section::make('Компанія та ПДВ')
+                    ->description('Виберіть компанію-виконавця та режим оподаткування для цього замовлення')
+                    ->schema([
+                        Forms\Components\Select::make('our_company_id')
+                            ->label('Компанія-виконавець')
+                            ->relationship('ourCompany', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->live()
+                            ->afterStateUpdated(function (Forms\Set $set, $state) {
+                                if ($state) {
+                                    $company = \App\Models\OurCompany::find($state);
+                                    if ($company) {
+                                        $set('with_vat', $company->hasVat());
+                                    }
+                                }
+                            })
+                            ->helperText('Компанія, яка буде виконувати замовлення'),
+
+                        Forms\Components\Toggle::make('with_vat')
+                            ->label('З ПДВ')
+                            ->default(false)
+                            ->disabled()
+                            ->dehydrateStateUsing(fn ($state) => (bool) $state)
+                            ->helperText('Встановлюється автоматично відповідно до системи оподаткування компанії'),
+
+                        Forms\Components\Actions::make([
+                            Forms\Components\Actions\Action::make('createInvoice')
+                                ->label('Створити і відкрити рахунок')
+                                ->icon('heroicon-o-document-plus')
+                                ->color('success')
+                                ->size('lg')
+                                ->visible(fn (Forms\Get $get, ?Order $record): bool =>
+                                    !empty($get('our_company_id')) &&
+                                    $get('with_vat') !== null &&
+                                    $record &&
+                                    !$record->invoice &&
+                                    $record->items()->exists()
+                                )
+                                ->action(function (Order $record, Forms\Get $get, $livewire) {
+                                    // 1. Save order data
+                                    $record->update([
+                                        'our_company_id' => $get('our_company_id'),
+                                        'with_vat' => (bool) $get('with_vat'),
+                                        'discount_type' => $get('discount_type') ?? 'none',
+                                        'discount_value' => (float) ($get('discount_value') ?? 0),
+                                    ]);
+                                    $record->refresh();
+
+                                    // 2. Create invoice
+                                    $company = \App\Models\OurCompany::find($get('our_company_id'));
+                                    $counterparty = $record->counterparty;
+
+                                    if (!$counterparty && $record->customer_phone) {
+                                        $counterparty = \App\Models\Counterparty::where('phone', $record->customer_phone)->first();
+                                    }
+                                    if (!$counterparty) {
+                                        $counterparty = \App\Models\Counterparty::create([
+                                            'name' => $record->customer_name,
+                                            'phone' => $record->customer_phone,
+                                            'address' => $record->delivery_address,
+                                            'is_auto_created' => true,
+                                        ]);
+                                    }
+
+                                    $items = $record->items->map(fn ($item) => [
+                                        'name' => $item->name,
+                                        'quantity' => (float) $item->quantity,
+                                        'unit' => $item->unit ?? 'шт.',
+                                        'unit_price' => (float) $item->unit_price,
+                                        'discount_type' => $item->discount_type ?? '',
+                                        'discount_value' => (float) ($item->discount_value ?? 0),
+                                        'total' => (float) $item->total,
+                                    ])->toArray();
+
+                                    $discountType = $get('discount_type');
+                                    $discountTypeEnum = match($discountType) {
+                                        'percent' => DiscountType::PERCENT,
+                                        'fixed' => DiscountType::FIXED,
+                                        default => DiscountType::NONE,
+                                    };
+
+                                    $action = app(\App\Actions\Invoice\CreateInvoiceAction::class);
+                                    $invoice = $action->execute(
+                                        company: $company,
+                                        counterparty: $counterparty,
+                                        items: $items,
+                                        withVat: (bool) $get('with_vat'),
+                                        order: $record,
+                                        isPaid: (bool) $record->payed,
+                                        discountType: $discountTypeEnum,
+                                        discountValue: (float) ($get('discount_value') ?? 0),
+                                    );
+
+                                    \Filament\Notifications\Notification::make()
+                                        ->success()
+                                        ->title('Рахунок створено')
+                                        ->body("Рахунок {$invoice->invoice_number} успішно створено")
+                                        ->send();
+
+                                    // Redirect to the created invoice
+                                    $livewire->redirect(\App\Filament\Resources\InvoiceResource::getUrl('edit', ['record' => $invoice]));
+                                }),
+                        ])->columnSpanFull(),
+                    ])
+                    ->columns(2)
+                    ->visibleOn('edit'),
             ]);
     }
 
@@ -515,7 +529,7 @@ class OrderResource extends Resource
     {
         return $table
             ->modifyQueryUsing(fn ($query) => $query->with(['shop', 'invoice', 'ourCompany', 'counterparty', 'items']))
-            ->recordUrl(fn (Order $record) => static::getUrl('edit', ['record' => $record]))
+            ->recordUrl(fn (Order $record) => $record->invoice ? static::getUrl('view', ['record' => $record]) : static::getUrl('edit', ['record' => $record]))
             ->columns([
                 Tables\Columns\TextColumn::make('shop.name')
                     ->label('Магазин')
@@ -670,7 +684,7 @@ class OrderResource extends Resource
                               '</tr></thead><tbody class="divide-y divide-gray-200 dark:divide-gray-700">' .
                               $record->items->map(fn ($item) =>
                                   '<tr><td class="px-3 py-2 text-gray-900 dark:text-gray-100">' . e($item->name) . '</td>' .
-                                  '<td class="px-3 py-2 text-right text-gray-600 dark:text-gray-400">' . number_format($item->quantity, 2, ',', ' ') . '</td>' .
+                                  '<td class="px-3 py-2 text-right text-gray-600 dark:text-gray-400">' . number_format($item->quantity, 0, ',', ' ') . '</td>' .
                                   '<td class="px-3 py-2 text-right text-gray-600 dark:text-gray-400">' . number_format($item->unit_price, 2, ',', ' ') . '</td>' .
                                   '<td class="px-3 py-2 text-right text-gray-600 dark:text-gray-400">' .
                                       match($item->discount_type) { 'percent' => number_format($item->discount_value, 0) . '%', 'fixed' => number_format($item->discount_value, 2, ',', ' ') . ' грн', default => '—' } .
@@ -758,6 +772,7 @@ class OrderResource extends Resource
     {
         return [
             'index' => Pages\ListOrders::route('/'),
+            'view' => Pages\ViewOrder::route('/{record}/view'),
             'edit' => Pages\EditOrder::route('/{record}/edit'),
         ];
     }

@@ -16,7 +16,7 @@
                         <tr>
                             <td class="px-4 py-3 text-gray-900 dark:text-gray-100">{{ $item->name }}</td>
                             <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
-                                {{ rtrim(rtrim(number_format($item->quantity, 3, ',', ' '), '0'), ',') }}
+                                {{ number_format($item->quantity, 0) }}
                             </td>
                             <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
                                 {{ number_format($item->unit_price, 2, ',', ' ') }} грн

@@ -46,30 +46,6 @@ class AdminPanelProvider extends PanelProvider
                         .fi-ta-actions-cell { white-space: nowrap !important; }
                     }
                     .fi-main { min-width: 0 !important; }
-
-                    /* Sticky table toolbar */
-                    .fi-ta-header-toolbar {
-                        position: sticky;
-                        top: 0;
-                        z-index: 20;
-                        background-color: white;
-                        border-bottom: 1px solid rgb(229 231 235);
-                    }
-                    .dark .fi-ta-header-toolbar {
-                        background-color: rgb(17 24 39);
-                        border-bottom-color: rgb(55 65 81);
-                    }
-
-                    /* Sticky table header */
-                    .fi-ta-header {
-                        position: sticky;
-                        top: 57px;
-                        z-index: 10;
-                        background-color: rgb(249 250 251);
-                    }
-                    .dark .fi-ta-header {
-                        background-color: rgb(31 41 55);
-                    }
                 </style>'
             )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')

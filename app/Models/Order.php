@@ -40,6 +40,8 @@ class Order extends Model
         'with_vat',
         'subtotal',
         'discount_total',
+        'discount_type',
+        'discount_value',
         'order_number',
     ];
 
@@ -53,6 +55,7 @@ class Order extends Model
             'payed' => 'boolean',
             'subtotal' => 'decimal:2',
             'discount_total' => 'decimal:2',
+            'discount_value' => 'decimal:2',
             'synced_at' => 'datetime',
         ];
     }

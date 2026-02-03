@@ -209,7 +209,7 @@
                 @foreach($invoice->items as $item)
                     <tr>
                         <td>{{ $item->name }}</td>
-                        <td class="text-right">{{ number_format($item->quantity, 3, '.', '') }}</td>
+                        <td class="text-right">{{ number_format($item->quantity, 0) }}</td>
                         <td class="text-center">{{ $item->unit }}</td>
                         <td class="text-right">{{ number_format($item->unit_price, 2, ',', ' ') }} грн</td>
                         <td class="text-right">{{ number_format($item->subtotal, 2, ',', ' ') }} грн</td>

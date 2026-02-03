@@ -27,7 +27,7 @@ class InvoiceItem extends Model
     protected function casts(): array
     {
         return [
-            'quantity' => 'decimal:3',
+            'quantity' => 'integer',
             'subtotal' => 'decimal:2',
             'unit_price' => 'decimal:2',
             'discount_value' => 'decimal:2',
@@ -89,8 +89,6 @@ class InvoiceItem extends Model
 
     public function getFormattedQuantity(): string
     {
-        $quantity = rtrim(rtrim(number_format($this->quantity, 3, ',', ' '), '0'), ',');
-
-        return $quantity . ' ' . $this->unit;
+        return $this->quantity . ' ' . $this->unit;
     }
 }
